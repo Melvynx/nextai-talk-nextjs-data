@@ -1,3 +1,5 @@
+import { Tiktoken } from "@dqbd/tiktoken";
+import cl100k_base from "@dqbd/tiktoken/encoders/cl100k_base.json";
 import { neon } from "@neondatabase/serverless";
 import dotenv from "dotenv";
 import fs from "fs/promises";
@@ -17,6 +19,12 @@ const openai = new OpenAI({
 });
 
 const sql = neon(databaseUrl);
+
+const enconding = new Tiktoken(
+  cl100k_base.bpe_ranks,
+  cl100k_base.special_tokens,
+  cl100k_base.pat_str
+);
 
 // -----------
 // Step 1
@@ -53,6 +61,29 @@ async function processFiles(folder: string): Promise<TextFile[]> {
 }
 
 // -----------
+// Step 2
+// -----------
+
+type TextFileToken = TextFile & {
+  token: Uint32Array;
+};
+
+const tiktokenizer = async (files: TextFile[]): Promise<TextFileToken[]> => {
+  const textFileTokens: TextFileToken[] = [];
+
+  for (const file of files) {
+    const token = enconding.encode(file.text);
+
+    textFileTokens.push({
+      ...file,
+      token,
+    });
+  }
+
+  return textFileTokens;
+};
+
+// -----------
 // Main
 // -----------
 
@@ -62,6 +93,11 @@ async function main() {
   const texts = await cache_withFile(
     () => processFiles(FOLDER),
     "processed/texts.json"
+  );
+
+  const textsTokens = await cache_withFile(
+    () => tiktokenizer(texts),
+    "processed/textsTokens.json"
   );
 }
 
