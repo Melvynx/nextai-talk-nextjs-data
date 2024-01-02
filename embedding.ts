@@ -206,6 +206,50 @@ async function processEmbeddings(
 }
 
 // -----------
+// Step 5
+// -----------
+
+async function saveToDatabase(texts: TextFileTokenEmbedding[]) {
+  let totalSaved = 0;
+  let totalSkip = 0;
+
+  for await (const row of texts) {
+    let { embedding, filePath, text } = row;
+
+    if (text.length < 100) {
+      totalSkip++;
+      console.log("🚫 Skipping: ", text, `Total: ${totalSkip}`);
+      continue;
+    }
+
+    totalSaved++;
+
+    const vectorSize = 1536;
+
+    const vectorPadded = new Array(vectorSize).fill(0);
+    vectorPadded.splice(0, embedding.length, ...embedding);
+
+    const insertQuery = `INSERT INTO documents (text, n_tokens, file_path, embeddings) values ($1, $2, $3, $4);`;
+
+    const tokens = enconding.encode(text);
+    const tokensLength = tokens.length;
+
+    await sql(insertQuery, [
+      text,
+      tokensLength,
+      filePath,
+      JSON.stringify(vectorPadded),
+    ]);
+
+    console.log(
+      "🎈 Saved to database :",
+      filePath,
+      `(${totalSaved}/${texts.length})`
+    );
+  }
+}
+
+// -----------
 // Main
 // -----------
 
@@ -231,6 +275,8 @@ async function main() {
     () => processEmbeddings(textsTokensShortened),
     "processed/textsTokensEmbeddings.json"
   );
+
+  await saveToDatabase(textsTokensEmbeddings);
 }
 
 main();
