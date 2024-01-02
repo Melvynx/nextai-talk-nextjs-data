@@ -89,27 +89,41 @@ const tiktokenizer = async (files: TextFile[]): Promise<TextFileToken[]> => {
 
 const MAX_TOKENS = 500;
 
-async function splitTextToMany(text: TextFileToken): Promise<TextFileToken[]> {
+async function splitTextToMany(text: TextFileToken): Promise<TextFile[]> {
   const sentences = text.text
     .split(". ")
     .map((sentence) => ({
-      text: sentence,
+      text: sentence + ". ",
       numberTokens: enconding.encode(sentence).length,
     }))
     .reduce((acc, sentence) => {
       // if the sentence is too long, split it by \n
       if (sentence.numberTokens > MAX_TOKENS) {
         const sentences = sentence.text.split("\n").map((sentence) => ({
-          text: sentence,
+          text: sentence + "\n",
           numberTokens: enconding.encode(sentence).length,
         }));
+
+        // check if new sentences is to long, if it's the case, cut every space
+        const sentencesTooLong = sentences.filter(
+          (sentence) => sentence.numberTokens > MAX_TOKENS
+        );
+
+        if (sentencesTooLong.length > 0) {
+          const word = sentence.text.split(" ").map((sentence) => ({
+            text: sentence + " ",
+            numberTokens: enconding.encode(sentence).length,
+          }));
+
+          return [...acc, ...word];
+        }
 
         return [...acc, ...sentences];
       }
       return [...acc, sentence];
     }, [] as { text: string; numberTokens: number }[]);
 
-  const chunks: TextFileToken[] = [];
+  const chunks: TextFile[] = [];
 
   let tokensSoFar = 0;
   let currentChunks: TextFileToken[] = [];
@@ -118,11 +132,10 @@ async function splitTextToMany(text: TextFileToken): Promise<TextFileToken[]> {
     const numberToken = sentence.numberTokens;
 
     if (tokensSoFar + numberToken > MAX_TOKENS) {
-      const chunkText = currentChunks.map((c) => c.text).join(". ");
+      const chunkText = currentChunks.map((c) => c.text).join("");
       chunks.push({
         filePath: text.filePath,
-        text: currentChunks.map((c) => c.text).join(". "),
-        token: enconding.encode(chunkText),
+        text: chunkText,
       });
 
       currentChunks = [];
@@ -139,19 +152,20 @@ async function splitTextToMany(text: TextFileToken): Promise<TextFileToken[]> {
   }
 
   if (currentChunks.length > 0) {
-    const chunkText = currentChunks.map((c) => c.text).join(". ");
-    chunks.push({
-      filePath: text.filePath,
-      text: currentChunks.map((c) => c.text).join(". "),
-      token: enconding.encode(chunkText),
-    });
+    const chunkText = currentChunks.map((c) => c.text).join("");
+    if (chunkText.length > 100) {
+      chunks.push({
+        filePath: text.filePath,
+        text: chunkText,
+      });
+    }
   }
 
   return chunks;
 }
 
-async function splitTexts(texts: TextFileToken[]): Promise<TextFileToken[]> {
-  const shortened: TextFileToken[] = [];
+async function splitTexts(texts: TextFileToken[]): Promise<TextFile[]> {
+  const shortened: TextFile[] = [];
 
   for (const file of texts) {
     if (file.token.length > MAX_TOKENS) {
@@ -174,7 +188,7 @@ type TextFileTokenEmbedding = TextFile & {
 };
 
 async function processEmbeddings(
-  texts: TextFileToken[]
+  texts: TextFile[]
 ): Promise<TextFileTokenEmbedding[]> {
   const embededs: TextFileTokenEmbedding[] = [];
   let i = 0;
@@ -261,10 +275,7 @@ async function main() {
     "processed/texts.json"
   );
 
-  const textsTokens = await cache_withFile(
-    () => tiktokenizer(texts),
-    "processed/textsTokens.json"
-  );
+  const textsTokens = await tiktokenizer(texts);
 
   const textsTokensShortened = await cache_withFile(
     () => splitTexts(textsTokens),
