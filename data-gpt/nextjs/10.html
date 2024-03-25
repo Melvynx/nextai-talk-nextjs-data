@@ -1,0 +1,3746 @@
+default.jsThis documentation is still being written. Please check back later.
+error.jsAn error file defines an error UI boundary for a route segment.
+It is useful for catching unexpected errors that occur in Server Components and Client Components and displaying a fallback UI.
+app/dashboard/error.tsxTypeScript'use client' // Error components must be Client Components
+ 
+import { useEffect } from 'react'
+ 
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string }
+  reset: () => void
+}) {
+  useEffect(() => {
+    // Log the error to an error reporting service
+    console.error(error)
+  }, [error])
+ 
+  return (
+    <div>
+      <h2>Something went wrong!</h2>
+      <button
+        onClick={
+          // Attempt to recover by trying to re-render the segment
+          () => reset()
+        }
+      >
+        Try again
+      </button>
+    </div>
+  )
+}
+
+Props
+  
+    
+    
+  
+
+error
+  
+    
+    
+  
+
+An instance of an Error object forwarded to the error.js Client Component.
+error.message
+  
+    
+    
+  
+
+The error message.
+
+For errors forwarded from Client Components, this will be the original Error's message.
+For errors forwarded from Server Components, this will be a generic error message to avoid leaking sensitive details. errors.digest can be used to match the corresponding error in server-side logs.
+
+error.digest
+  
+    
+    
+  
+
+An automatically generated hash of the error thrown in a Server Component. It can be used to match the corresponding error in server-side logs.
+reset
+  
+    
+    
+  
+
+A function to reset the error boundary. When executed, the function will try to re-render the Error boundary's contents. If successful, the fallback error component is replaced with the result of the re-render.
+Can be used to prompt the user to attempt to recover from the error.
+
+Good to know:
+
+error.js boundaries must be Client Components.
+In Production builds, errors forwarded from Server Components will be stripped of specific error details to avoid leaking sensitive information.
+An error.js boundary will not handle errors thrown in a layout.js component in the same segment because the error boundary is nested inside that layouts component.
+
+To handle errors for a specific layout, place an error.js file in the layouts parent segment.
+To handle errors within the root layout or template, use a variation of error.js called app/global-error.js.
+
+
+
+
+global-error.js
+  
+    
+    
+  
+
+To specifically handle errors in root layout.js, use a variation of error.js called app/global-error.js located in the root app directory.
+app/global-error.tsxTypeScript'use client'
+ 
+export default function GlobalError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string }
+  reset: () => void
+}) {
+  return (
+    <html>
+      <body>
+        <h2>Something went wrong!</h2>
+        <button onClick={() => reset()}>Try again</button>
+      </body>
+    </html>
+  )
+}
+
+
+Good to know:
+
+global-error.js replaces the root layout.js when active and so must define its own <html> and <body> tags.
+While designing error UI, you may find it helpful to use the React Developer Tools to manually toggle Error boundaries.
+
+
+not-found.js
+  
+    
+    
+  
+
+The not-found file is used to render UI when the notFound() function is thrown within a route segment.
+Version History
+  
+    
+    
+  
+
+VersionChangesv13.1.0global-error introduced.v13.0.0error introduced.
+layout.jsA layout is UI that is shared between routes.
+app/dashboard/layout.tsxTypeScriptexport default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return <section>{children}</section>
+}
+
+A root layout is the top-most layout in the root app directory. It is used to define the <html> and <body> tags and other globally shared UI.
+app/layout.tsxTypeScriptexport default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  )
+}
+
+Props
+  
+    
+    
+  
+
+children (required)
+  
+    
+    
+  
+
+Layout components should accept and use a children prop. During rendering, children will be populated with the route segments the layout is wrapping. These will primarily be the component of a child Layout (if it exists) or Page, but could also be other special files like Loading or Error when applicable.
+params (optional)
+  
+    
+    
+  
+
+The dynamic route parameters object from the root segment down to that layout.
+ExampleURLparamsapp/dashboard/[team]/layout.js/dashboard/1{ team: '1' }app/shop/[tag]/[item]/layout.js/shop/1/2{ tag: '1', item: '2' }app/blog/[...slug]/layout.js/blog/1/2{ slug: ['1', '2'] }
+For example:
+app/shop/[tag]/[item]/layout.tsxTypeScriptexport default function ShopLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode
+  params: {
+    tag: string
+    item: string
+  }
+}) {
+  // URL -> /shop/shoes/nike-air-max-97
+  // `params` -> { tag: 'shoes', item: 'nike-air-max-97' }
+  return <section>{children}</section>
+}
+
+Good to know
+  
+    
+    
+  
+
+Layouts do not receive searchParams
+  
+    
+    
+  
+
+Unlike Pages, Layout components do not receive the searchParams prop. This is because a shared layout is not re-rendered during navigation which could lead to stale searchParams between navigations.
+When using client-side navigation, Next.js automatically only renders the part of the page below the common layout between two routes.
+For example, in the following directory structure, dashboard/layout.tsx is the common layout for both /dashboard/settings and /dashboard/analytics:
+
+When navigating from /dashboard/settings to /dashboard/analytics, page.tsx in /dashboard/analytics will rerender on the server, while dashboard/layout.tsx will not rerender because it's a common UI shared between the two routes.
+This performance optimization allows navigation between pages that share a layout to be quicker as only the data fetching and rendering for the page has to run, instead of the entire route that could include shared layouts that fetch their own data.
+Because dashboard/layout.tsx doesn't re-render, the searchParams prop in the layout Server Component might become stale after navigation.
+
+Instead, use the Page searchParams prop or the useSearchParams hook in a Client Component, which is re-rendered on the client with the latest searchParams.
+
+Root Layouts
+  
+    
+    
+  
+
+
+The app directory must include a root app/layout.js.
+The root layout must define <html> and <body> tags.
+
+You should not manually add <head> tags such as <title> and <meta> to root layouts. Instead, you should use the Metadata API which automatically handles advanced requirements such as streaming and de-duplicating <head> elements.
+
+
+You can use route groups to create multiple root layouts.
+
+Navigating across multiple root layouts will cause a full page load (as opposed to a client-side navigation). For example, navigating from /cart that uses app/(shop)/layout.js to /blog that uses app/(marketing)/layout.js will cause a full page load. This only applies to multiple root layouts.
+
+
+
+Version History
+  
+    
+    
+  
+
+VersionChangesv13.0.0layout introduced.
+loading.jsA loading file can create instant loading states built on Suspense.
+By default, this file is a Server Component - but can also be used as a Client Component through the "use client" directive.
+app/feed/loading.tsxTypeScriptexport default function Loading() {
+  // Or a custom loading skeleton component
+  return <p>Loading...</p>
+}
+
+Loading UI components do not accept any parameters.
+
+Good to know
+
+While designing loading UI, you may find it helpful to use the React Developer Tools to manually toggle Suspense boundaries.
+
+
+Version History
+  
+    
+    
+  
+
+VersionChangesv13.0.0loading introduced.
+Metadata Files API ReferenceThis section of the docs covers Metadata file conventions. File-based metadata can be defined by adding special metadata files to route segments.
+Each file convention can be defined using a static file (e.g. opengraph-image.jpg), or a dynamic variant that uses code to generate the file (e.g. opengraph-image.js).
+Once a file is defined, Next.js will automatically serve the file (with hashes in production for caching) and update the relevant head elements with the correct metadata, such as the asset's URL, file type, and image size.
+favicon, icon, and apple-iconThe favicon, icon, or apple-icon file conventions allow you to set icons for your application.
+They are useful for adding app icons that appear in places like web browser tabs, phone home screens, and search engine results.
+There are two ways to set app icons:
+
+Using image files (.ico, .jpg, .png)
+Using code to generate an icon (.js, .ts, .tsx)
+
+Image files (.ico, .jpg, .png)
+  
+    
+    
+  
+
+Use an image file to set an app icon by placing a favicon, icon, or apple-icon image file within your /app directory.
+The favicon image can only be located in the top level of app/.
+Next.js will evaluate the file and automatically add the appropriate tags to your app's <head> element.
+File conventionSupported file typesValid locationsfavicon.icoapp/icon.ico, .jpg, .jpeg, .png, .svgapp/**/*apple-icon.jpg, .jpeg, .pngapp/**/*
+favicon
+  
+    
+    
+  
+
+Add a favicon.ico image file to the root /app route segment.
+<head> output<link rel="icon" href="/favicon.ico" sizes="any" />
+icon
+  
+    
+    
+  
+
+Add an icon.(ico|jpg|jpeg|png|svg) image file.
+<head> output<link
+  rel="icon"
+  href="/icon?<generated>"
+  type="image/<generated>"
+  sizes="<generated>"
+/>
+apple-icon
+  
+    
+    
+  
+
+Add an apple-icon.(jpg|jpeg|png) image file.
+<head> output<link
+  rel="apple-touch-icon"
+  href="/apple-icon?<generated>"
+  type="image/<generated>"
+  sizes="<generated>"
+/>
+
+Good to know
+
+You can set multiple icons by adding a number suffix to the file name. For example, icon1.png, icon2.png, etc. Numbered files will sort lexically.
+Favicons can only be set in the root /app segment. If you need more granularity, you can use icon.
+The appropriate <link> tags and attributes such as rel, href, type, and sizes are determined by the icon type and metadata of the evaluated file.
+
+For example, a 32 by 32px .png file will have type="image/png" and sizes="32x32" attributes.
+
+
+sizes="any" is added to favicon.ico output to avoid a browser bug where an .ico icon is favored over .svg.
+
+
+Generate icons using code (.js, .ts, .tsx)
+  
+    
+    
+  
+
+In addition to using literal image files, you can programmatically generate icons using code.
+Generate an app icon by creating an icon or apple-icon route that default exports a function.
+File conventionSupported file typesicon.js, .ts, .tsxapple-icon.js, .ts, .tsx
+The easiest way to generate an icon is to use the ImageResponse API from next/og.
+app/icon.tsxTypeScriptimport { ImageResponse } from 'next/og'
+ 
+// Route segment config
+export const runtime = 'edge'
+ 
+// Image metadata
+export const size = {
+  width: 32,
+  height: 32,
+}
+export const contentType = 'image/png'
+ 
+// Image generation
+export default function Icon() {
+  return new ImageResponse(
+    (
+      // ImageResponse JSX element
+      <div
+        style={{
+          fontSize: 24,
+          background: 'black',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'white',
+        }}
+      >
+        A
+      </div>
+    ),
+    // ImageResponse options
+    {
+      // For convenience, we can re-use the exported icons size metadata
+      // config to also set the ImageResponse's width and height.
+      ...size,
+    }
+  )
+}
+
+<head> output<link rel="icon" href="/icon?<generated>" type="image/png" sizes="32x32" />
+
+Good to know
+
+By default, generated icons are statically optimized (generated at build time and cached) unless they use dynamic functions or uncached data.
+You can generate multiple icons in the same file using generateImageMetadata.
+You cannot generate a favicon icon. Use icon or a favicon.ico file instead.
+
+
+Props
+  
+    
+    
+  
+
+The default export function receives the following props:
+params (optional)
+  
+    
+    
+  
+
+An object containing the dynamic route parameters object from the root segment down to the segment icon or apple-icon is colocated in.
+app/shop/[slug]/icon.tsxTypeScriptexport default function Icon({ params }: { params: { slug: string } }) {
+  // ...
+}
+
+RouteURLparamsapp/shop/icon.js/shopundefinedapp/shop/[slug]/icon.js/shop/1{ slug: '1' }app/shop/[tag]/[item]/icon.js/shop/1/2{ tag: '1', item: '2' }app/shop/[...slug]/icon.js/shop/1/2{ slug: ['1', '2'] }
+Returns
+  
+    
+    
+  
+
+The default export function should return a Blob | ArrayBuffer | TypedArray | DataView | ReadableStream | Response.
+
+Good to know: ImageResponse satisfies this return type.
+
+Config exports
+  
+    
+    
+  
+
+You can optionally configure the icon's metadata by exporting size and contentType variables from the icon or apple-icon route.
+OptionTypesize{ width: number; height: number }contentTypestring - image MIME type
+size
+  
+    
+    
+  
+
+icon.tsx | apple-icon.tsxTypeScriptexport const size = { width: 32, height: 32 }
+ 
+export default function Icon() {}
+
+<head> output<link rel="icon" sizes="32x32" />
+contentType
+  
+    
+    
+  
+
+icon.tsx | apple-icon.tsxTypeScriptexport const contentType = 'image/png'
+ 
+export default function Icon() {}
+
+<head> output<link rel="icon" type="image/png" />
+Route Segment Config
+  
+    
+    
+  
+
+icon and apple-icon are specialized Route Handlers that can use the same route segment configuration options as Pages and Layouts.
+OptionTypeDefaultdynamic'auto' | 'force-dynamic' | 'error' | 'force-static''auto'revalidatefalse | 'force-cache' | 0 | numberfalseruntime'nodejs' | 'edge''nodejs'preferredRegion'auto' | 'global' | 'home' | string | string[]'auto'
+app/icon.tsxTypeScriptexport const runtime = 'edge'
+ 
+export default function Icon() {}
+
+Version History
+  
+    
+    
+  
+
+VersionChangesv13.3.0favicon icon and apple-icon introduced
+manifest.jsonAdd or generate a manifest.(json|webmanifest) file that matches the Web Manifest Specification in the root of app directory to provide information about your web application for the browser.
+Static Manifest file
+  
+    
+    
+  
+
+app/manifest.json | app/manifest.webmanifest{
+  "name": "My Next.js Application",
+  "short_name": "Next.js App",
+  "description": "An application built with Next.js",
+  "start_url": "/"
+  // ...
+}
+Generate a Manifest file
+  
+    
+    
+  
+
+Add a manifest.js or manifest.ts file that returns a Manifest object.
+app/manifest.tsTypeScriptimport { MetadataRoute } from 'next'
+ 
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: 'Next.js App',
+    short_name: 'Next.js App',
+    description: 'Next.js App',
+    start_url: '/',
+    display: 'standalone',
+    background_color: '#fff',
+    theme_color: '#fff',
+    icons: [
+      {
+        src: '/favicon.ico',
+        sizes: 'any',
+        type: 'image/x-icon',
+      },
+    ],
+  }
+}
+
+Manifest Object
+  
+    
+    
+  
+
+The manifest object contains an extensive list of options that may be updated due to new web standards. For information on all the current options, refer to the MetadataRoute.Manifest type in your code editor if using TypeScript or see the MDN docs.
+opengraph-image and twitter-imageThe opengraph-image and twitter-image file conventions allow you to set Open Graph and Twitter images for a route segment.
+They are useful for setting the images that appear on social networks and messaging apps when a user shares a link to your site.
+There are two ways to set Open Graph and Twitter images:
+
+Using image files (.jpg, .png, .gif)
+Using code to generate images (.js, .ts, .tsx)
+
+Image files (.jpg, .png, .gif)
+  
+    
+    
+  
+
+Use an image file to set a route segment's shared image by placing an opengraph-image or twitter-image image file in the segment.
+Next.js will evaluate the file and automatically add the appropriate tags to your app's <head> element.
+File conventionSupported file typesopengraph-image.jpg, .jpeg, .png, .giftwitter-image.jpg, .jpeg, .png, .gifopengraph-image.alt.txttwitter-image.alt.txt
+opengraph-image
+  
+    
+    
+  
+
+Add an opengraph-image.(jpg|jpeg|png|gif) image file to any route segment.
+<head> output<meta property="og:image" content="<generated>" />
+<meta property="og:image:type" content="<generated>" />
+<meta property="og:image:width" content="<generated>" />
+<meta property="og:image:height" content="<generated>" />
+twitter-image
+  
+    
+    
+  
+
+Add a twitter-image.(jpg|jpeg|png|gif) image file to any route segment.
+<head> output<meta name="twitter:image" content="<generated>" />
+<meta name="twitter:image:type" content="<generated>" />
+<meta name="twitter:image:width" content="<generated>" />
+<meta name="twitter:image:height" content="<generated>" />
+opengraph-image.alt.txt
+  
+    
+    
+  
+
+Add an accompanying opengraph-image.alt.txt file in the same route segment as the opengraph-image.(jpg|jpeg|png|gif) image it's alt text.
+opengraph-image.alt.txtAbout Acme
+<head> output<meta property="og:image:alt" content="About Acme" />
+twitter-image.alt.txt
+  
+    
+    
+  
+
+Add an accompanying twitter-image.alt.txt file in the same route segment as the twitter-image.(jpg|jpeg|png|gif) image it's alt text.
+twitter-image.alt.txtAbout Acme
+<head> output<meta property="twitter:image:alt" content="About Acme" />
+Generate images using code (.js, .ts, .tsx)
+  
+    
+    
+  
+
+In addition to using literal image files, you can programmatically generate images using code.
+Generate a route segment's shared image by creating an opengraph-image or twitter-image route that default exports a function.
+File conventionSupported file typesopengraph-image.js, .ts, .tsxtwitter-image.js, .ts, .tsx
+
+Good to know
+
+By default, generated images are statically optimized (generated at build time and cached) unless they use dynamic functions or uncached data.
+You can generate multiple Images in the same file using generateImageMetadata.
+
+
+The easiest way to generate an image is to use the ImageResponse API from next/og.
+app/about/opengraph-image.tsxTypeScriptimport { ImageResponse } from 'next/og'
+ 
+// Route segment config
+export const runtime = 'edge'
+ 
+// Image metadata
+export const alt = 'About Acme'
+export const size = {
+  width: 1200,
+  height: 630,
+}
+ 
+export const contentType = 'image/png'
+ 
+// Image generation
+export default async function Image() {
+  // Font
+  const interSemiBold = fetch(
+    new URL('./Inter-SemiBold.ttf', import.meta.url)
+  ).then((res) => res.arrayBuffer())
+ 
+  return new ImageResponse(
+    (
+      // ImageResponse JSX element
+      <div
+        style={{
+          fontSize: 128,
+          background: 'white',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        About Acme
+      </div>
+    ),
+    // ImageResponse options
+    {
+      // For convenience, we can re-use the exported opengraph-image
+      // size config to also set the ImageResponse's width and height.
+      ...size,
+      fonts: [
+        {
+          name: 'Inter',
+          data: await interSemiBold,
+          style: 'normal',
+          weight: 400,
+        },
+      ],
+    }
+  )
+}
+
+<head> output<meta property="og:image" content="<generated>" />
+<meta property="og:image:alt" content="About Acme" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+Props
+  
+    
+    
+  
+
+The default export function receives the following props:
+params (optional)
+  
+    
+    
+  
+
+An object containing the dynamic route parameters object from the root segment down to the segment opengraph-image or twitter-image is colocated in.
+app/shop/[slug]/opengraph-image.tsxTypeScriptexport default function Image({ params }: { params: { slug: string } }) {
+  // ...
+}
+
+RouteURLparamsapp/shop/opengraph-image.js/shopundefinedapp/shop/[slug]/opengraph-image.js/shop/1{ slug: '1' }app/shop/[tag]/[item]/opengraph-image.js/shop/1/2{ tag: '1', item: '2' }app/shop/[...slug]/opengraph-image.js/shop/1/2{ slug: ['1', '2'] }
+Returns
+  
+    
+    
+  
+
+The default export function should return a Blob | ArrayBuffer | TypedArray | DataView | ReadableStream | Response.
+
+Good to know: ImageResponse satisfies this return type.
+
+Config exports
+  
+    
+    
+  
+
+You can optionally configure the image's metadata by exporting alt, size, and contentType variables from opengraph-image or twitter-image route.
+OptionTypealtstringsize{ width: number; height: number }contentTypestring - image MIME type
+alt
+  
+    
+    
+  
+
+opengraph-image.tsx | twitter-image.tsxTypeScriptexport const alt = 'My images alt text'
+ 
+export default function Image() {}
+
+<head> output<meta property="og:image:alt" content="My images alt text" />
+size
+  
+    
+    
+  
+
+opengraph-image.tsx | twitter-image.tsxTypeScriptexport const size = { width: 1200, height: 630 }
+ 
+export default function Image() {}
+
+<head> output<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+contentType
+  
+    
+    
+  
+
+opengraph-image.tsx | twitter-image.tsxTypeScriptexport const contentType = 'image/png'
+ 
+export default function Image() {}
+
+<head> output<meta property="og:image:type" content="image/png" />
+Route Segment Config
+  
+    
+    
+  
+
+opengraph-image and twitter-image are specialized Route Handlers that can use the same route segment configuration options as Pages and Layouts.
+OptionTypeDefaultdynamic'auto' | 'force-dynamic' | 'error' | 'force-static''auto'revalidatefalse | 'force-cache' | 0 | numberfalseruntime'nodejs' | 'edge''nodejs'preferredRegion'auto' | 'global' | 'home' | string | string[]'auto'
+app/opengraph-image.tsxTypeScriptexport const runtime = 'edge'
+ 
+export default function Image() {}
+
+Examples
+  
+    
+    
+  
+
+Using external data
+  
+    
+    
+  
+
+This example uses the params object and external data to generate the image.
+
+Good to know:
+By default, this generated image will be statically optimized. You can configure the individual fetch options or route segments options to change this behavior.
+
+app/posts/[slug]/opengraph-image.tsxTypeScriptimport { ImageResponse } from 'next/og'
+ 
+export const runtime = 'edge'
+ 
+export const alt = 'About Acme'
+export const size = {
+  width: 1200,
+  height: 630,
+}
+export const contentType = 'image/png'
+ 
+export default async function Image({ params }: { params: { slug: string } }) {
+  const post = await fetch(`https://.../posts/${params.slug}`).then((res) =>
+    res.json()
+  )
+ 
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          fontSize: 48,
+          background: 'white',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {post.title}
+      </div>
+    ),
+    {
+      ...size,
+    }
+  )
+}
+
+Version History
+  
+    
+    
+  
+
+VersionChangesv13.3.0opengraph-image and twitter-image introduced.
+robots.txtAdd or generate a robots.txt file that matches the Robots Exclusion Standard in the root of app directory to tell search engine crawlers which URLs they can access on your site.
+Static robots.txt
+  
+    
+    
+  
+
+app/robots.txtUser-Agent: *
+Allow: /
+Disallow: /private/
+
+Sitemap: https://acme.com/sitemap.xml
+Generate a Robots file
+  
+    
+    
+  
+
+Add a robots.js or robots.ts file that returns a Robots object.
+app/robots.tsTypeScriptimport { MetadataRoute } from 'next'
+ 
+export default function robots(): MetadataRoute.Robots {
+  return {
+    rules: {
+      userAgent: '*',
+      allow: '/',
+      disallow: '/private/',
+    },
+    sitemap: 'https://acme.com/sitemap.xml',
+  }
+}
+
+Output:
+User-Agent: *
+Allow: /
+Disallow: /private/
+
+Sitemap: https://acme.com/sitemap.xml
+Robots object
+  
+    
+    
+  
+
+type Robots = {
+  rules:
+    | {
+        userAgent?: string | string[]
+        allow?: string | string[]
+        disallow?: string | string[]
+        crawlDelay?: number
+      }
+    | Array<{
+        userAgent: string | string[]
+        allow?: string | string[]
+        disallow?: string | string[]
+        crawlDelay?: number
+      }>
+  sitemap?: string | string[]
+  host?: string
+}
+Version History
+  
+    
+    
+  
+
+VersionChangesv13.3.0robots introduced.
+sitemap.xmlsitemap.(xml|js|ts) is a special file that matches the Sitemaps XML format to help search engine crawlers index your site more efficiently.
+Sitemap files (.xml)
+  
+    
+    
+  
+
+For smaller applications, you can create a sitemap.xml file and place it in the root of your app directory.
+app/sitemap.xml<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://acme.com</loc>
+    <lastmod>2023-04-06T15:02:24.021Z</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>1</priority>
+  </url>
+  <url>
+    <loc>https://acme.com/about</loc>
+    <lastmod>2023-04-06T15:02:24.021Z</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://acme.com/blog</loc>
+    <lastmod>2023-04-06T15:02:24.021Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+</urlset>
+Generating a sitemap using code (.js, .ts)
+  
+    
+    
+  
+
+You can use the sitemap.(js|ts) file convention to programmatically generate a sitemap by exporting a default function that returns an array of URLs. If using TypeScript, a Sitemap type is available.
+app/sitemap.tsTypeScriptimport { MetadataRoute } from 'next'
+ 
+export default function sitemap(): MetadataRoute.Sitemap {
+  return [
+    {
+      url: 'https://acme.com',
+      lastModified: new Date(),
+      changeFrequency: 'yearly',
+      priority: 1,
+    },
+    {
+      url: 'https://acme.com/about',
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.8,
+    },
+    {
+      url: 'https://acme.com/blog',
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.5,
+    },
+  ]
+}
+
+Output:
+acme.com/sitemap.xml<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://acme.com</loc>
+    <lastmod>2023-04-06T15:02:24.021Z</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>1</priority>
+  </url>
+  <url>
+    <loc>https://acme.com/about</loc>
+    <lastmod>2023-04-06T15:02:24.021Z</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://acme.com/blog</loc>
+    <lastmod>2023-04-06T15:02:24.021Z</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+</urlset>
+Generating multiple sitemaps
+  
+    
+    
+  
+
+While a single sitemap will work for most applications. For large web applications, you may need to split a sitemap into multiple files.
+There are two ways you can create multiple sitemaps:
+
+By nesting sitemap.(xml|js|ts) inside multiple route segments e.g. app/sitemap.xml and app/products/sitemap.xml.
+By using the generateSitemaps function.
+
+For example, to split a sitemap using generateSitemaps, return an array of objects with the sitemap id. Then, use the id to generate the unique sitemaps.
+app/product/sitemap.tsTypeScriptimport { BASE_URL } from '@/app/lib/constants'
+ 
+export async function generateSitemaps() {
+  // Fetch the total number of products and calculate the number of sitemaps needed
+  return [{ id: 0 }, { id: 1 }, { id: 2 }, { id: 3 }]
+}
+ 
+export default async function sitemap({
+  id,
+}: {
+  id: number
+}): Promise<MetadataRoute.Sitemap> {
+  // Google's limit is 50,000 URLs per sitemap
+  const start = id * 50000
+  const end = start + 50000
+  const products = await getProducts(
+    `SELECT id, date FROM products WHERE id BETWEEN ${start} AND ${end}`
+  )
+  return products.map((product) => ({
+    url: `${BASE_URL}/product/${id}`,
+    lastModified: product.date,
+  }))
+}
+
+In production, your generated sitemaps will be available at /.../sitemap/[id].xml. For example, /product/sitemap/1.xml.
+In development, you can view the generated sitemap on /.../sitemap.xml/[id]. For example, /product/sitemap.xml/1. This difference is temporary and will follow the production format.
+See the generateSitemaps API reference for more information.
+Returns
+  
+    
+    
+  
+
+The default function exported from sitemap.(xml|ts|js) should return an array of objects with the following properties:
+type Sitemap = Array<{
+  url: string
+  lastModified?: string | Date
+  changeFrequency?:
+    | 'always'
+    | 'hourly'
+    | 'daily'
+    | 'weekly'
+    | 'monthly'
+    | 'yearly'
+    | 'never'
+  priority?: number
+}>
+Version History
+  
+    
+    
+  
+
+VersionChangesv13.3.0sitemap introduced.v13.4.5Add changeFrequency and priority attributes to sitemaps.
+not-found.jsThe not-found file is used to render UI when the notFound function is thrown within a route segment. Along with serving a custom UI, Next.js will return a 200 HTTP status code for streamed responses, and 404 for non-streamed responses.
+app/not-found.tsxTypeScriptimport Link from 'next/link'
+ 
+export default function NotFound() {
+  return (
+    <div>
+      <h2>Not Found</h2>
+      <p>Could not find requested resource</p>
+      <Link href="/">Return Home</Link>
+    </div>
+  )
+}
+
+
+Good to know: In addition to catching expected notFound() errors, the root app/not-found.js file also handles any unmatched URLs for your whole application. This means users that visit a URL that is not handled by your app will be shown the UI exported by the app/not-found.js file.
+
+Props
+  
+    
+    
+  
+
+not-found.js components do not accept any props.
+Data Fetching
+  
+    
+    
+  
+
+By default, not-found is a Server Component. You can mark it as async to fetch and display data:
+app/not-found.tsxTypeScriptimport Link from 'next/link'
+import { headers } from 'next/headers'
+ 
+export default async function NotFound() {
+  const headersList = headers()
+  const domain = headersList.get('host')
+  const data = await getSiteData(domain)
+  return (
+    <div>
+      <h2>Not Found: {data.name}</h2>
+      <p>Could not find requested resource</p>
+      <p>
+        View <Link href="/blog">all posts</Link>
+      </p>
+    </div>
+  )
+}
+
+If you need to use Client Component hooks like usePathname to display content based on the path, you must fetch data on the client-side instead.
+Version History
+  
+    
+    
+  
+
+VersionChangesv13.3.0Root app/not-found handles global unmatched URLs.v13.0.0not-found introduced.
+page.jsA page is UI that is unique to a route.
+app/blog/[slug]/page.tsxTypeScriptexport default function Page({
+  params,
+  searchParams,
+}: {
+  params: { slug: string }
+  searchParams: { [key: string]: string | string[] | undefined }
+}) {
+  return <h1>My Page</h1>
+}
+
+Props
+  
+    
+    
+  
+
+params (optional)
+  
+    
+    
+  
+
+An object containing the dynamic route parameters from the root segment down to that page. For example:
+ExampleURLparamsapp/shop/[slug]/page.js/shop/1{ slug: '1' }app/shop/[category]/[item]/page.js/shop/1/2{ category: '1', item: '2' }app/shop/[...slug]/page.js/shop/1/2{ slug: ['1', '2'] }
+searchParams (optional)
+  
+    
+    
+  
+
+An object containing the search parameters of the current URL. For example:
+URLsearchParams/shop?a=1{ a: '1' }/shop?a=1&b=2{ a: '1', b: '2' }/shop?a=1&a=2{ a: ['1', '2'] }
+
+Good to know:
+
+searchParams is a Dynamic API whose values cannot be known ahead of time. Using it will opt the page into dynamic rendering at request time.
+searchParams returns a plain JavaScript object and not a URLSearchParams instance.
+
+
+Version History
+  
+    
+    
+  
+
+VersionChangesv13.0.0page introduced.
+Route Segment ConfigThe Route Segment options allows you configure the behavior of a Page, Layout, or Route Handler by directly exporting the following variables:
+OptionTypeDefaultdynamic'auto' | 'force-dynamic' | 'error' | 'force-static''auto'dynamicParamsbooleantruerevalidatefalse | 'force-cache' | 0 | numberfalsefetchCache'auto' | 'default-cache' | 'only-cache' | 'force-cache' | 'force-no-store' | 'default-no-store' | 'only-no-store''auto'runtime'nodejs' | 'edge''nodejs'preferredRegion'auto' | 'global' | 'home' | string | string[]'auto'maxDurationnumberSet by deployment platform
+layout.tsx | page.tsx | route.tsTypeScriptexport const dynamic = 'auto'
+export const dynamicParams = true
+export const revalidate = false
+export const fetchCache = 'auto'
+export const runtime = 'nodejs'
+export const preferredRegion = 'auto'
+export const maxDuration = 5
+ 
+export default function MyComponent() {}
+
+
+Good to know:
+
+The values of the config options currently need be statically analyzable. For example revalidate = 600 is valid, but revalidate = 60 * 10 is not.
+
+
+Options
+  
+    
+    
+  
+
+dynamic
+  
+    
+    
+  
+
+Change the dynamic behavior of a layout or page to fully static or fully dynamic.
+layout.tsx | page.tsx | route.tsTypeScriptexport const dynamic = 'auto'
+// 'auto' | 'force-dynamic' | 'error' | 'force-static'
+
+
+Good to know: The new model in the app directory favors granular caching control at the fetch request level over the binary all-or-nothing model of getServerSideProps and getStaticProps at the page-level in the pages directory. The dynamic option is a way to opt back in to the previous model as a convenience and provides a simpler migration path.
+
+
+
+'auto' (default): The default option to cache as much as possible without preventing any components from opting into dynamic behavior.
+
+
+'force-dynamic': Force dynamic rendering, which will result in routes being rendered for each user at request time. This option is equivalent to getServerSideProps() in the pages directory.
+
+
+'error': Force static rendering and cache the data of a layout or page by causing an error if any components use dynamic functions or uncached data. This option is equivalent to:
+
+getStaticProps() in the pages directory.
+Setting the option of every fetch() request in a layout or page to { cache: 'force-cache' }.
+Setting the segment config to fetchCache = 'only-cache', dynamicParams = false.
+dynamic = 'error' changes the default of dynamicParams from true to false. You can opt back into dynamically rendering pages for dynamic params not generated by generateStaticParams by manually setting dynamicParams = true.
+
+
+
+'force-static': Force static rendering and cache the data of a layout or page by forcing cookies(), headers() and useSearchParams() to return empty values.
+
+
+
+Good to know:
+
+Instructions on how to migrate from getServerSideProps and getStaticProps to dynamic: 'force-dynamic' and dynamic: 'error' can be found in the upgrade guide.
+
+
+dynamicParams
+  
+    
+    
+  
+
+Control what happens when a dynamic segment is visited that was not generated with generateStaticParams.
+layout.tsx | page.tsxTypeScriptexport const dynamicParams = true // true | false,
+
+
+true (default): Dynamic segments not included in generateStaticParams are generated on demand.
+false: Dynamic segments not included in generateStaticParams will return a 404.
+
+
+Good to know:
+
+This option replaces the fallback: true | false | blocking option of getStaticPaths in the pages directory.
+When dynamicParams = true, the segment uses Streaming Server Rendering.
+If the dynamic = 'error' and dynamic = 'force-static' are used, it'll change the default of dynamicParams to false.
+
+
+revalidate
+  
+    
+    
+  
+
+Set the default revalidation time for a layout or page. This option does not override the revalidate value set by individual fetch requests.
+layout.tsx | page.tsx | route.tsTypeScriptexport const revalidate = false
+// false | 'force-cache' | 0 | number
+
+
+false: (default) The default heuristic to cache any fetch requests that set their cache option to 'force-cache' or are discovered before a dynamic function is used. Semantically equivalent to revalidate: Infinity which effectively means the resource should be cached indefinitely. It is still possible for individual fetch requests to use cache: 'no-store' or revalidate: 0 to avoid being cached and make the route dynamically rendered. Or set revalidate to a positive number lower than the route default to increase the revalidation frequency of a route.
+0: Ensure a layout or page is always dynamically rendered even if no dynamic functions or uncached data fetches are discovered. This option changes the default of fetch requests that do not set a cache option to 'no-store' but leaves fetch requests that opt into 'force-cache' or use a positive revalidate as is.
+number: (in seconds) Set the default revalidation frequency of a layout or page to n seconds.
+
+
+Good to know: The revalidate option is only available when using the Node.js Runtime. This means using the revalidate option with runtime = 'edge' will not work.
+
+Revalidation Frequency
+  
+    
+    
+  
+
+
+The lowest revalidate across each layout and page of a single route will determine the revalidation frequency of the entire route. This ensures that child pages are revalidated as frequently as their parent layouts.
+Individual fetch requests can set a lower revalidate than the route's default revalidate to increase the revalidation frequency of the entire route. This allows you to dynamically opt-in to more frequent revalidation for certain routes based on some criteria.
+
+fetchCache
+  
+    
+    
+  
+
+This is an advanced option that should only be used if you specifically need to override the default behavior.By default, Next.js will cache any fetch() requests that are reachable before any dynamic functions are used and will not cache fetch requests that are discovered after dynamic functions are used.fetchCache allows you to override the default cache option of all fetch requests in a layout or page.layout.tsx | page.tsx | route.tsTypeScriptexport const fetchCache = 'auto'
+// 'auto' | 'default-cache' | 'only-cache'
+// 'force-cache' | 'force-no-store' | 'default-no-store' | 'only-no-store'
+'auto' (default)- The default option to cache fetch requests before dynamic functions with the cache option they provide and not cache fetch requests after dynamic functions.
+'default-cache': Allow any cache option to be passed to fetch but if no option is provided then set the cache option to 'force-cache'. This means that even fetch requests after dynamic functions are considered static.
+'only-cache': Ensure all fetch requests opt into caching by changing the default to cache: 'force-cache' if no option is provided and causing an error if any fetch requests use cache: 'no-store'.
+'force-cache': Ensure all fetch requests opt into caching by setting the cache option of all fetch requests to 'force-cache'.
+'default-no-store': Allow any cache option to be passed to fetch but if no option is provided then set the cache option to 'no-store'. This means that even fetch requests before dynamic functions are considered dynamic.
+'only-no-store': Ensure all fetch requests opt out of caching by changing the default to cache: 'no-store' if no option is provided and causing an error if any fetch requests use cache: 'force-cache'
+'force-no-store': Ensure all fetch requests opt out of caching by setting the cache option of all fetch requests to 'no-store'. This forces all fetch requests to be re-fetched every request even if they provide a 'force-cache' option.
+Cross-route segment behavior
+  
+    
+    
+  
+
+Any options set across each layout and page of a single route need to be compatible with each other.
+
+If both the 'only-cache' and 'force-cache' are provided, then 'force-cache' wins. If both 'only-no-store' and 'force-no-store' are provided, then 'force-no-store' wins. The force option changes the behavior across the route so a single segment with 'force-*' would prevent any errors caused by 'only-*'.
+The intention of the 'only-*' and force-*' options is to guarantee the whole route is either fully static or fully dynamic. This means:
+
+A combination of 'only-cache' and 'only-no-store' in a single route is not allowed.
+A combination of 'force-cache' and 'force-no-store' in a single route is not allowed.
+
+
+A parent cannot provide 'default-no-store' if a child provides 'auto' or '*-cache' since that could make the same fetch have different behavior.
+
+
+It is generally recommended to leave shared parent layouts as 'auto' and customize the options where child segments diverge.
+
+runtime
+  
+    
+    
+  
+
+layout.tsx | page.tsx | route.tsTypeScriptexport const runtime = 'nodejs'
+// 'edge' | 'nodejs'
+
+
+nodejs (default)
+edge
+
+Learn more about the Edge and Node.js runtimes.
+preferredRegion
+  
+    
+    
+  
+
+layout.tsx | page.tsx | route.tsTypeScriptexport const preferredRegion = 'auto'
+// 'auto' | 'global' | 'home' | ['iad1', 'sfo1']
+
+Support for preferredRegion, and regions supported, is dependent on your deployment platform.
+
+Good to know:
+
+If a preferredRegion is not specified, it will inherit the option of the nearest parent layout.
+The root layout defaults to all regions.
+
+
+maxDuration
+  
+    
+    
+  
+
+Based on your deployment platform, you may be able to use a higher default execution time for your function.
+This setting allows you to opt into a higher execution time within your plans limit.
+Note: This settings requires Next.js 13.4.10 or higher.
+layout.tsx | page.tsx | route.tsTypeScriptexport const maxDuration = 5
+
+
+Good to know:
+
+If a maxDuration is not specified, the default value is dependent on your deployment platform and plan.
+
+
+generateStaticParams
+  
+    
+    
+  
+
+The generateStaticParams function can be used in combination with dynamic route segments to define the list of route segment parameters that will be statically generated at build time instead of on-demand at request time.
+See the API reference for more details.
+route.jsRoute Handlers allow you to create custom request handlers for a given route using the Web Request and Response APIs.
+HTTP Methods
+  
+    
+    
+  
+
+A route file allows you to create custom request handlers for a given route. The following HTTP methods are supported: GET, POST, PUT, PATCH, DELETE, HEAD, and OPTIONS.
+route.tsTypeScriptexport async function GET(request: Request) {}
+ 
+export async function HEAD(request: Request) {}
+ 
+export async function POST(request: Request) {}
+ 
+export async function PUT(request: Request) {}
+ 
+export async function DELETE(request: Request) {}
+ 
+export async function PATCH(request: Request) {}
+ 
+// If `OPTIONS` is not defined, Next.js will automatically implement `OPTIONS` and  set the appropriate Response `Allow` header depending on the other methods defined in the route handler.
+export async function OPTIONS(request: Request) {}
+
+
+Good to know: Route Handlers are only available inside the app directory. You do not need to use API Routes (pages) and Route Handlers (app) together, as Route Handlers should be able to handle all use cases.
+
+Parameters
+  
+    
+    
+  
+
+request (optional)
+  
+    
+    
+  
+
+The request object is a NextRequest object, which is an extension of the Web Request API. NextRequest gives you further control over the incoming request, including easily accessing cookies and an extended, parsed, URL object nextUrl.
+context (optional)
+  
+    
+    
+  
+
+app/dashboard/[team]/route.jsexport async function GET(request, context: { params }) {
+  const team = params.team // '1'
+}
+Currently, the only value of context is params, which is an object containing the dynamic route parameters for the current route.
+ExampleURLparamsapp/dashboard/[team]/route.js/dashboard/1{ team: '1' }app/shop/[tag]/[item]/route.js/shop/1/2{ tag: '1', item: '2' }app/blog/[...slug]/route.js/blog/1/2{ slug: ['1', '2'] }
+NextResponse
+  
+    
+    
+  
+
+Route Handlers can extend the Web Response API by returning a NextResponse object. This allows you to easily set cookies, headers, redirect, and rewrite. View the API reference.
+Version History
+  
+    
+    
+  
+
+VersionChangesv13.2.0Route handlers are introduced.
+template.jsA template file is similar to a layout in that it wraps each child layout or page. Unlike layouts that persist across routes and maintain state, templates create a new instance for each of their children on navigation.
+app/template.tsxTypeScriptexport default function Template({ children }: { children: React.ReactNode }) {
+  return <div>{children}</div>
+}
+
+
+While less common, you might choose a template over a layout if you want:
+
+Features that rely on useEffect (e.g logging page views) and useState (e.g a per-page feedback form).
+To change the default framework behavior. For example, Suspense Boundaries inside layouts only show the fallback the first time the Layout is loaded and not when switching pages. For templates, the fallback is shown on each navigation.
+
+Props
+  
+    
+    
+  
+
+children (required)
+  
+    
+    
+  
+
+Template components should accept and use a children prop. template is rendered between a layout and its children. For example:
+Output<Layout>
+  {/* Note that the template is given a unique key. */}
+  <Template key={routeParam}>{children}</Template>
+</Layout>
+
+Good to know:
+
+By default, template is a Server Component, but can also be used as a Client Component through the "use client" directive.
+When a user navigates between routes that share a template, a new instance of the component is mounted, DOM elements are recreated, state is not preserved, and effects are re-synchronized.
+
+
+Version History
+  
+    
+    
+  
+
+VersionChangesv13.0.0template introduced.
+Functions
+cookiesThe cookies function allows you to read the HTTP incoming request cookies from a Server Component or write outgoing request cookies in a Server Action or Route Handler.
+
+Good to know: cookies() is a Dynamic Function whose returned values cannot be known ahead of time. Using it in a layout or page will opt a route into dynamic rendering at request time.
+
+cookies().get(name)
+  
+    
+    
+  
+
+A method that takes a cookie name and returns an object with name and value. If a cookie with name isn't found, it returns undefined. If multiple cookies match, it will only return the first match.
+app/page.jsimport { cookies } from 'next/headers'
+ 
+export default function Page() {
+  const cookieStore = cookies()
+  const theme = cookieStore.get('theme')
+  return '...'
+}
+cookies().getAll()
+  
+    
+    
+  
+
+A method that is similar to get, but returns a list of all the cookies with a matching name. If name is unspecified, it returns all the available cookies.
+app/page.jsimport { cookies } from 'next/headers'
+ 
+export default function Page() {
+  const cookieStore = cookies()
+  return cookieStore.getAll().map((cookie) => (
+    <div key={cookie.name}>
+      <p>Name: {cookie.name}</p>
+      <p>Value: {cookie.value}</p>
+    </div>
+  ))
+}
+cookies().has(name)
+  
+    
+    
+  
+
+A method that takes a cookie name and returns a boolean based on if the cookie exists (true) or not (false).
+app/page.jsimport { cookies } from 'next/headers'
+ 
+export default function Page() {
+  const cookiesList = cookies()
+  const hasCookie = cookiesList.has('theme')
+  return '...'
+}
+cookies().set(name, value, options)
+  
+    
+    
+  
+
+A method that takes a cookie name, value, and options and sets the outgoing request cookie.
+
+Good to know: HTTP does not allow setting cookies after streaming starts, so you must use .set() in a Server Action or Route Handler.
+
+app/actions.js'use server'
+ 
+import { cookies } from 'next/headers'
+ 
+async function create(data) {
+  cookies().set('name', 'lee')
+  // or
+  cookies().set('name', 'lee', { secure: true })
+  // or
+  cookies().set({
+    name: 'name',
+    value: 'lee',
+    httpOnly: true,
+    path: '/',
+  })
+}
+Deleting cookies
+  
+    
+    
+  
+
+
+Good to know: You can only delete cookies in a Server Action or Route Handler.
+
+There are several options for deleting a cookie:
+cookies().delete(name)
+  
+    
+    
+  
+
+You can explicitly delete a cookie with a given name.
+app/actions.js'use server'
+ 
+import { cookies } from 'next/headers'
+ 
+async function delete(data) {
+  cookies().delete('name')
+}
+cookies().set(name, '')
+  
+    
+    
+  
+
+Alternatively, you can set a new cookie with the same name and an empty value.
+app/actions.js'use server'
+ 
+import { cookies } from 'next/headers'
+ 
+async function delete(data) {
+  cookies().set('name', '')
+}
+
+Good to know: .set() is only available in a Server Action or Route Handler.
+
+cookies().set(name, value, { maxAge: 0 })
+  
+    
+    
+  
+
+Setting maxAge to 0 will immediately expire a cookie.
+app/actions.js'use server'
+ 
+import { cookies } from 'next/headers'
+ 
+async function delete(data) {
+  cookies().set('name', 'value', { maxAge: 0 })
+}
+cookies().set(name, value, { expires: timestamp })
+  
+    
+    
+  
+
+Setting expires to any value in the past will immediately expire a cookie.
+app/actions.js'use server'
+ 
+import { cookies } from 'next/headers'
+ 
+async function delete(data) {
+  const oneDay = 24 * 60 * 60 * 1000
+  cookies().set('name', 'value', { expires: Date.now() - oneDay })
+}
+
+Good to know: You can only delete cookies that belong to the same domain from which .set() is called. Additionally, the code must be executed on the same protocol (HTTP or HTTPS) as the cookie you want to delete.
+
+Version History
+  
+    
+    
+  
+
+VersionChangesv13.0.0cookies introduced.
+draftModeThe draftMode function allows you to detect Draft Mode inside a Server Component.
+app/page.jsimport { draftMode } from 'next/headers'
+ 
+export default function Page() {
+  const { isEnabled } = draftMode()
+  return (
+    <main>
+      <h1>My Blog Post</h1>
+      <p>Draft Mode is currently {isEnabled ? 'Enabled' : 'Disabled'}</p>
+    </main>
+  )
+}
+Version History
+  
+    
+    
+  
+
+VersionChangesv13.4.0draftMode introduced.
+fetchNext.js extends the native Web fetch() API to allow each request on the server to set its own persistent caching semantics.
+In the browser, the cache option indicates how a fetch request will interact with the browser's HTTP cache. With this extension, cache indicates how a server-side fetch request will interact with the framework's persistent HTTP cache.
+You can call fetch with async and await directly within Server Components.
+app/page.tsxTypeScriptexport default async function Page() {
+  // This request should be cached until manually invalidated.
+  // Similar to `getStaticProps`.
+  // `force-cache` is the default and can be omitted.
+  const staticData = await fetch(`https://...`, { cache: 'force-cache' })
+ 
+  // This request should be refetched on every request.
+  // Similar to `getServerSideProps`.
+  const dynamicData = await fetch(`https://...`, { cache: 'no-store' })
+ 
+  // This request should be cached with a lifetime of 10 seconds.
+  // Similar to `getStaticProps` with the `revalidate` option.
+  const revalidatedData = await fetch(`https://...`, {
+    next: { revalidate: 10 },
+  })
+ 
+  return <div>...</div>
+}
+
+fetch(url, options)
+  
+    
+    
+  
+
+Since Next.js extends the Web fetch() API, you can use any of the native options available.
+options.cache
+  
+    
+    
+  
+
+Configure how the request should interact with Next.js Data Cache.
+fetch(`https://...`, { cache: 'force-cache' | 'no-store' })
+
+force-cache (default) - Next.js looks for a matching request in its Data Cache.
+
+If there is a match and it is fresh, it will be returned from the cache.
+If there is no match or a stale match, Next.js will fetch the resource from the remote server and update the cache with the downloaded resource.
+
+
+no-store - Next.js fetches the resource from the remote server on every request without looking in the cache, and it will not update the cache with the downloaded resource.
+
+
+Good to know:
+
+If you don't provide a cache option, Next.js will default to force-cache, unless a dynamic function such as cookies() is used, in which case it will default to no-store.
+The no-cache option behaves the same way as no-store in Next.js.
+
+
+options.next.revalidate
+  
+    
+    
+  
+
+fetch(`https://...`, { next: { revalidate: false | 0 | number } })
+Set the cache lifetime of a resource (in seconds).
+
+false - Cache the resource indefinitely. Semantically equivalent to revalidate: Infinity. The HTTP cache may evict older resources over time.
+0 - Prevent the resource from being cached.
+number - (in seconds) Specify the resource should have a cache lifetime of at most n seconds.
+
+
+Good to know:
+
+If an individual fetch() request sets a revalidate number lower than the default revalidate of a route, the whole route revalidation interval will be decreased.
+If two fetch requests with the same URL in the same route have different revalidate values, the lower value will be used.
+As a convenience, it is not necessary to set the cache option if revalidate is set to a number since 0 implies cache: 'no-store' and a positive value implies cache: 'force-cache'.
+Conflicting options such as { revalidate: 0, cache: 'force-cache' } or { revalidate: 10, cache: 'no-store' } will cause an error.
+
+
+options.next.tags
+  
+    
+    
+  
+
+fetch(`https://...`, { next: { tags: ['collection'] } })
+Set the cache tags of a resource. Data can then be revalidated on-demand using revalidateTag. The max length for a custom tag is 256 characters.
+Version History
+  
+    
+    
+  
+
+VersionChangesv13.0.0fetch introduced.
+generateImageMetadataYou can use generateImageMetadata to generate different versions of one image or return multiple images for one route segment. This is useful for when you want to avoid hard-coding metadata values, such as for icons.
+Parameters
+  
+    
+    
+  
+
+generateImageMetadata function accepts the following parameters:
+params (optional)
+  
+    
+    
+  
+
+An object containing the dynamic route parameters object from the root segment down to the segment generateImageMetadata is called from.
+icon.tsxTypeScriptexport function generateImageMetadata({
+  params,
+}: {
+  params: { slug: string }
+}) {
+  // ...
+}
+
+RouteURLparamsapp/shop/icon.js/shopundefinedapp/shop/[slug]/icon.js/shop/1{ slug: '1' }app/shop/[tag]/[item]/icon.js/shop/1/2{ tag: '1', item: '2' }app/shop/[...slug]/icon.js/shop/1/2{ slug: ['1', '2'] }
+Returns
+  
+    
+    
+  
+
+The generateImageMetadata function should return an array of objects containing the image's metadata such as alt and size. In addition, each item must include an id value which will be passed to the props of the image generating function.
+Image Metadata ObjectTypeidstring (required)altstringsize{ width: number; height: number }contentTypestring
+icon.tsxTypeScriptimport { ImageResponse } from 'next/og'
+ 
+export function generateImageMetadata() {
+  return [
+    {
+      contentType: 'image/png',
+      size: { width: 48, height: 48 },
+      id: 'small',
+    },
+    {
+      contentType: 'image/png',
+      size: { width: 72, height: 72 },
+      id: 'medium',
+    },
+  ]
+}
+ 
+export default function Icon({ id }: { id: string }) {
+  return new ImageResponse(
+    (
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 88,
+          background: '#000',
+          color: '#fafafa',
+        }}
+      >
+        Icon {id}
+      </div>
+    )
+  )
+}
+
+Examples
+  
+    
+    
+  
+
+Using external data
+  
+    
+    
+  
+
+This example uses the params object and external data to generate multiple Open Graph images for a route segment.
+app/products/[id]/opengraph-image.tsxTypeScriptimport { ImageResponse } from 'next/og'
+import { getCaptionForImage, getOGImages } from '@/app/utils/images'
+ 
+export async function generateImageMetadata({
+  params,
+}: {
+  params: { id: string }
+}) {
+  const images = await getOGImages(params.id)
+ 
+  return images.map((image, idx) => ({
+    id: idx,
+    size: { width: 1200, height: 600 },
+    alt: image.text,
+    contentType: 'image/png',
+  }))
+}
+ 
+export default async function Image({
+  params,
+  id,
+}: {
+  params: { id: string }
+  id: number
+}) {
+  const productId = params.id
+  const imageId = id
+  const text = await getCaptionForImage(productId, imageId)
+ 
+  return new ImageResponse(
+    (
+      <div
+        style={
+          {
+            // ...
+          }
+        }
+      >
+        {text}
+      </div>
+    )
+  )
+}
+
+Version History
+  
+    
+    
+  
+
+VersionChangesv13.3.0generateImageMetadata introduced.
+Metadata Object and generateMetadata OptionsThis page covers all Config-based Metadata options with generateMetadata and the static metadata object.
+layout.tsx | page.tsxTypeScriptimport { Metadata } from 'next'
+ 
+// either Static metadata
+export const metadata: Metadata = {
+  title: '...',
+}
+ 
+// or Dynamic metadata
+export async function generateMetadata({ params }) {
+  return {
+    title: '...',
+  }
+}
+
+
+Good to know:
+
+The metadata object and generateMetadata function exports are only supported in Server Components.
+You cannot export both the metadata object and generateMetadata function from the same route segment.
+
+
+The metadata object
+  
+    
+    
+  
+
+To define static metadata, export a Metadata object from a layout.js or page.js file.
+layout.tsx | page.tsxTypeScriptimport { Metadata } from 'next'
+ 
+export const metadata: Metadata = {
+  title: '...',
+  description: '...',
+}
+ 
+export default function Page() {}
+
+See the Metadata Fields for a complete list of supported options.
+generateMetadata function
+  
+    
+    
+  
+
+Dynamic metadata depends on dynamic information, such as the current route parameters, external data, or metadata in parent segments, can be set by exporting a generateMetadata function that returns a Metadata object.
+app/products/[id]/page.tsxTypeScriptimport { Metadata, ResolvingMetadata } from 'next'
+ 
+type Props = {
+  params: { id: string }
+  searchParams: { [key: string]: string | string[] | undefined }
+}
+ 
+export async function generateMetadata(
+  { params, searchParams }: Props,
+  parent: ResolvingMetadata
+): Promise<Metadata> {
+  // read route params
+  const id = params.id
+ 
+  // fetch data
+  const product = await fetch(`https://.../${id}`).then((res) => res.json())
+ 
+  // optionally access and extend (rather than replace) parent metadata
+  const previousImages = (await parent).openGraph?.images || []
+ 
+  return {
+    title: product.title,
+    openGraph: {
+      images: ['/some-specific-page-image.jpg', ...previousImages],
+    },
+  }
+}
+ 
+export default function Page({ params, searchParams }: Props) {}
+
+Parameters
+  
+    
+    
+  
+
+generateMetadata function accepts the following parameters:
+
+
+props - An object containing the parameters of the current route:
+
+
+params - An object containing the dynamic route parameters object from the root segment down to the segment generateMetadata is called from. Examples:
+RouteURLparamsapp/shop/[slug]/page.js/shop/1{ slug: '1' }app/shop/[tag]/[item]/page.js/shop/1/2{ tag: '1', item: '2' }app/shop/[...slug]/page.js/shop/1/2{ slug: ['1', '2'] }
+
+
+searchParams - An object containing the current URL's search params. Examples:
+URLsearchParams/shop?a=1{ a: '1' }/shop?a=1&b=2{ a: '1', b: '2' }/shop?a=1&a=2{ a: ['1', '2'] }
+
+
+
+
+parent - A promise of the resolved metadata from parent route segments.
+
+
+Returns
+  
+    
+    
+  
+
+generateMetadata should return a Metadata object containing one or more metadata fields.
+
+Good to know:
+
+If metadata doesn't depend on runtime information, it should be defined using the static metadata object rather than generateMetadata.
+fetch requests are automatically memoized for the same data across generateMetadata, generateStaticParams, Layouts, Pages, and Server Components. React cache can be used if fetch is unavailable.
+searchParams are only available in page.js segments.
+The redirect() and notFound() Next.js methods can also be used inside generateMetadata.
+
+
+Metadata Fields
+  
+    
+    
+  
+
+title
+  
+    
+    
+  
+
+The title attribute is used to set the title of the document. It can be defined as a simple string or an optional template object.
+String
+  
+    
+    
+  
+
+layout.js | page.jsexport const metadata = {
+  title: 'Next.js',
+}
+<head> output<title>Next.js</title>
+Template object
+  
+    
+    
+  
+
+app/layout.tsxTypeScriptimport { Metadata } from 'next'
+ 
+export const metadata: Metadata = {
+  title: {
+    template: '...',
+    default: '...',
+    absolute: '...',
+  },
+}
+
+Default
+  
+    
+    
+  
+
+title.default can be used to provide a fallback title to child route segments that don't define a title.
+app/layout.tsximport type { Metadata } from 'next'
+ 
+export const metadata: Metadata = {
+  title: {
+    default: 'Acme',
+  },
+}
+app/about/page.tsximport type { Metadata } from 'next'
+ 
+export const metadata: Metadata = {}
+ 
+// Output: <title>Acme</title>
+Template
+  
+    
+    
+  
+
+title.template can be used to add a prefix or a suffix to titles defined in child route segments.
+app/layout.tsxTypeScriptimport { Metadata } from 'next'
+ 
+export const metadata: Metadata = {
+  title: {
+    template: '%s | Acme',
+    default: 'Acme', // a default is required when creating a template
+  },
+}
+
+app/about/page.tsxTypeScriptimport { Metadata } from 'next'
+ 
+export const metadata: Metadata = {
+  title: 'About',
+}
+ 
+// Output: <title>About | Acme</title>
+
+
+Good to know:
+
+
+title.template applies to child route segments and not the segment it's defined in. This means:
+
+title.default is required when you add a title.template.
+title.template defined in layout.js will not apply to a title defined in a page.js of the same route segment.
+title.template defined in page.js has no effect because a page is always the terminating segment (it doesn't have any children route segments).
+
+
+
+title.template has no effect if a route has not defined a title or title.default.
+
+
+
+Absolute
+  
+    
+    
+  
+
+title.absolute can be used to provide a title that ignores title.template set in parent segments.
+app/layout.tsxTypeScriptimport { Metadata } from 'next'
+ 
+export const metadata: Metadata = {
+  title: {
+    template: '%s | Acme',
+  },
+}
+
+app/about/page.tsxTypeScriptimport { Metadata } from 'next'
+ 
+export const metadata: Metadata = {
+  title: {
+    absolute: 'About',
+  },
+}
+ 
+// Output: <title>About</title>
+
+
+Good to know:
+
+
+layout.js
+
+title (string) and title.default define the default title for child segments (that do not define their own title). It will augment title.template from the closest parent segment if it exists.
+title.absolute defines the default title for child segments. It ignores title.template from parent segments.
+title.template defines a new title template for child segments.
+
+
+
+page.js
+
+If a page does not define its own title the closest parents resolved title will be used.
+title (string) defines the routes title. It will augment title.template from the closest parent segment if it exists.
+title.absolute defines the route title. It ignores title.template from parent segments.
+title.template has no effect in page.js because a page is always the terminating segment of a route.
+
+
+
+
+description
+  
+    
+    
+  
+
+layout.js | page.jsexport const metadata = {
+  description: 'The React Framework for the Web',
+}
+<head> output<meta name="description" content="The React Framework for the Web" />
+Basic Fields
+  
+    
+    
+  
+
+layout.js | page.jsexport const metadata = {
+  generator: 'Next.js',
+  applicationName: 'Next.js',
+  referrer: 'origin-when-cross-origin',
+  keywords: ['Next.js', 'React', 'JavaScript'],
+  authors: [{ name: 'Seb' }, { name: 'Josh', url: 'https://nextjs.org' }],
+  creator: 'Jiachi Liu',
+  publisher: 'Sebastian Markbåge',
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+}
+<head> output<meta name="application-name" content="Next.js" />
+<meta name="author" content="Seb" />
+<link rel="author" href="https://nextjs.org" />
+<meta name="author" content="Josh" />
+<meta name="generator" content="Next.js" />
+<meta name="keywords" content="Next.js,React,JavaScript" />
+<meta name="referrer" content="origin-when-cross-origin" />
+<meta name="color-scheme" content="dark" />
+<meta name="creator" content="Jiachi Liu" />
+<meta name="publisher" content="Sebastian Markbåge" />
+<meta name="format-detection" content="telephone=no, address=no, email=no" />
+metadataBase
+  
+    
+    
+  
+
+metadataBase is a convenience option to set a base URL prefix for metadata fields that require a fully qualified URL.
+
+metadataBase allows URL-based metadata fields defined in the current route segment and below to use a relative path instead of an otherwise required absolute URL.
+The field's relative path will be composed with metadataBase to form a fully qualified URL.
+If not configured, metadataBase is automatically populated with a default value.
+
+layout.js | page.jsexport const metadata = {
+  metadataBase: new URL('https://acme.com'),
+  alternates: {
+    canonical: '/',
+    languages: {
+      'en-US': '/en-US',
+      'de-DE': '/de-DE',
+    },
+  },
+  openGraph: {
+    images: '/og-image.png',
+  },
+}
+<head> output<link rel="canonical" href="https://acme.com" />
+<link rel="alternate" hreflang="en-US" href="https://acme.com/en-US" />
+<link rel="alternate" hreflang="de-DE" href="https://acme.com/de-DE" />
+<meta property="og:image" content="https://acme.com/og-image.png" />
+
+Good to know:
+
+metadataBase is typically set in root app/layout.js to apply to URL-based metadata fields across all routes.
+All URL-based metadata fields that require absolute URLs can be configured with a metadataBase option.
+metadataBase can contain a subdomain e.g. https://app.acme.com or base path e.g. https://acme.com/start/from/here
+If a metadata field provides an absolute URL, metadataBase will be ignored.
+Using a relative path in a URL-based metadata field without configuring a metadataBase will cause a build error.
+Next.js will normalize duplicate slashes between metadataBase (e.g. https://acme.com/) and a relative field (e.g. /path) to a single slash (e.g. https://acme.com/path)
+
+
+Default value
+  
+    
+    
+  
+
+If not configured, metadataBase has a default value
+
+When VERCEL_URL is detected: https://${process.env.VERCEL_URL} otherwise it falls back to http://localhost:${process.env.PORT || 3000}.
+When overriding the default, we recommend using environment variables to compute the URL. This allows configuring a URL for local development, staging, and production environments.
+
+URL Composition
+  
+    
+    
+  
+
+URL composition favors developer intent over default directory traversal semantics.
+
+Trailing slashes between metadataBase and metadata fields are normalized.
+An "absolute" path in a metadata field (that typically would replace the whole URL path) is treated as a "relative" path (starting from the end of metadataBase).
+
+For example, given the following metadataBase:
+app/layout.tsxTypeScriptimport { Metadata } from 'next'
+ 
+export const metadata: Metadata = {
+  metadataBase: new URL('https://acme.com'),
+}
+
+Any metadata fields that inherit the above metadataBase and set their own value will be resolved as follows:
+metadata fieldResolved URL/https://acme.com./https://acme.compaymentshttps://acme.com/payments/paymentshttps://acme.com/payments./paymentshttps://acme.com/payments../paymentshttps://acme.com/paymentshttps://beta.acme.com/paymentshttps://beta.acme.com/payments
+openGraph
+  
+    
+    
+  
+
+layout.js | page.jsexport const metadata = {
+  openGraph: {
+    title: 'Next.js',
+    description: 'The React Framework for the Web',
+    url: 'https://nextjs.org',
+    siteName: 'Next.js',
+    images: [
+      {
+        url: 'https://nextjs.org/og.png', // Must be an absolute URL
+        width: 800,
+        height: 600,
+      },
+      {
+        url: 'https://nextjs.org/og-alt.png', // Must be an absolute URL
+        width: 1800,
+        height: 1600,
+        alt: 'My custom alt',
+      },
+    ],
+    locale: 'en_US',
+    type: 'website',
+  },
+}
+<head> output<meta property="og:title" content="Next.js" />
+<meta property="og:description" content="The React Framework for the Web" />
+<meta property="og:url" content="https://nextjs.org/" />
+<meta property="og:site_name" content="Next.js" />
+<meta property="og:locale" content="en_US" />
+<meta property="og:image:url" content="https://nextjs.org/og.png" />
+<meta property="og:image:width" content="800" />
+<meta property="og:image:height" content="600" />
+<meta property="og:image:url" content="https://nextjs.org/og-alt.png" />
+<meta property="og:image:width" content="1800" />
+<meta property="og:image:height" content="1600" />
+<meta property="og:image:alt" content="My custom alt" />
+<meta property="og:type" content="website" />
+layout.js | page.jsexport const metadata = {
+  openGraph: {
+    title: 'Next.js',
+    description: 'The React Framework for the Web',
+    type: 'article',
+    publishedTime: '2023-01-01T00:00:00.000Z',
+    authors: ['Seb', 'Josh'],
+  },
+}
+<head> output<meta property="og:title" content="Next.js" />
+<meta property="og:description" content="The React Framework for the Web" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2023-01-01T00:00:00.000Z" />
+<meta property="article:author" content="Seb" />
+<meta property="article:author" content="Josh" />
+
+Good to know:
+
+It may be more convenient to use the file-based Metadata API for Open Graph images. Rather than having to sync the config export with actual files, the file-based API will automatically generate the correct metadata for you.
+
+
+robots
+  
+    
+    
+  
+
+import type { Metadata } from 'next'
+ 
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: true,
+    nocache: true,
+    googleBot: {
+      index: true,
+      follow: false,
+      noimageindex: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+}
+<head> output<meta name="robots" content="noindex, follow, nocache" />
+<meta
+  name="googlebot"
+  content="index, nofollow, noimageindex, max-video-preview:-1, max-image-preview:large, max-snippet:-1"
+/>
+icons
+  
+    
+    
+  
+
+
+Good to know: We recommend using the file-based Metadata API for icons where possible. Rather than having to sync the config export with actual files, the file-based API will automatically generate the correct metadata for you.
+
+layout.js | page.jsexport const metadata = {
+  icons: {
+    icon: '/icon.png',
+    shortcut: '/shortcut-icon.png',
+    apple: '/apple-icon.png',
+    other: {
+      rel: 'apple-touch-icon-precomposed',
+      url: '/apple-touch-icon-precomposed.png',
+    },
+  },
+}
+<head> output<link rel="shortcut icon" href="/shortcut-icon.png" />
+<link rel="icon" href="/icon.png" />
+<link rel="apple-touch-icon" href="/apple-icon.png" />
+<link
+  rel="apple-touch-icon-precomposed"
+  href="/apple-touch-icon-precomposed.png"
+/>
+layout.js | page.jsexport const metadata = {
+  icons: {
+    icon: [
+      { url: '/icon.png' },
+      new URL('/icon.png', 'https://example.com'),
+      { url: '/icon-dark.png', media: '(prefers-color-scheme: dark)' },
+    ],
+    shortcut: ['/shortcut-icon.png'],
+    apple: [
+      { url: '/apple-icon.png' },
+      { url: '/apple-icon-x3.png', sizes: '180x180', type: 'image/png' },
+    ],
+    other: [
+      {
+        rel: 'apple-touch-icon-precomposed',
+        url: '/apple-touch-icon-precomposed.png',
+      },
+    ],
+  },
+}
+<head> output<link rel="shortcut icon" href="/shortcut-icon.png" />
+<link rel="icon" href="/icon.png" />
+<link rel="icon" href="https://example.com/icon.png" />
+<link rel="icon" href="/icon-dark.png" media="(prefers-color-scheme: dark)" />
+<link rel="apple-touch-icon" href="/apple-icon.png" />
+<link
+  rel="apple-touch-icon-precomposed"
+  href="/apple-touch-icon-precomposed.png"
+/>
+<link
+  rel="apple-touch-icon"
+  href="/apple-icon-x3.png"
+  sizes="180x180"
+  type="image/png"
+/>
+
+Good to know: The msapplication-* meta tags are no longer supported in Chromium builds of Microsoft Edge, and thus no longer needed.
+
+themeColor
+  
+    
+    
+  
+
+
+Deprecated: The themeColor option in metadata is deprecated as of Next.js 14. Please use the viewport configuration instead.
+
+manifest
+  
+    
+    
+  
+
+A web application manifest, as defined in the Web Application Manifest specification.
+layout.js | page.jsexport const metadata = {
+  manifest: 'https://nextjs.org/manifest.json',
+}
+<head> output<link rel="manifest" href="https://nextjs.org/manifest.json" />
+twitter
+  
+    
+    
+  
+
+The Twitter specification is (surprisingly) used for more than just X (formerly known as Twitter).
+Learn more about the Twitter Card markup reference.
+layout.js | page.jsexport const metadata = {
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Next.js',
+    description: 'The React Framework for the Web',
+    siteId: '1467726470533754880',
+    creator: '@nextjs',
+    creatorId: '1467726470533754880',
+    images: ['https://nextjs.org/og.png'], // Must be an absolute URL
+  },
+}
+<head> output<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:site:id" content="1467726470533754880" />
+<meta name="twitter:creator" content="@nextjs" />
+<meta name="twitter:creator:id" content="1467726470533754880" />
+<meta name="twitter:title" content="Next.js" />
+<meta name="twitter:description" content="The React Framework for the Web" />
+<meta name="twitter:image" content="https://nextjs.org/og.png" />
+layout.js | page.jsexport const metadata = {
+  twitter: {
+    card: 'app',
+    title: 'Next.js',
+    description: 'The React Framework for the Web',
+    siteId: '1467726470533754880',
+    creator: '@nextjs',
+    creatorId: '1467726470533754880',
+    images: {
+      url: 'https://nextjs.org/og.png',
+      alt: 'Next.js Logo',
+    },
+    app: {
+      name: 'twitter_app',
+      id: {
+        iphone: 'twitter_app://iphone',
+        ipad: 'twitter_app://ipad',
+        googleplay: 'twitter_app://googleplay',
+      },
+      url: {
+        iphone: 'https://iphone_url',
+        ipad: 'https://ipad_url',
+      },
+    },
+  },
+}
+<head> output<meta name="twitter:site:id" content="1467726470533754880" />
+<meta name="twitter:creator" content="@nextjs" />
+<meta name="twitter:creator:id" content="1467726470533754880" />
+<meta name="twitter:title" content="Next.js" />
+<meta name="twitter:description" content="The React Framework for the Web" />
+<meta name="twitter:card" content="app" />
+<meta name="twitter:image" content="https://nextjs.org/og.png" />
+<meta name="twitter:image:alt" content="Next.js Logo" />
+<meta name="twitter:app:name:iphone" content="twitter_app" />
+<meta name="twitter:app:id:iphone" content="twitter_app://iphone" />
+<meta name="twitter:app:id:ipad" content="twitter_app://ipad" />
+<meta name="twitter:app:id:googleplay" content="twitter_app://googleplay" />
+<meta name="twitter:app:url:iphone" content="https://iphone_url" />
+<meta name="twitter:app:url:ipad" content="https://ipad_url" />
+<meta name="twitter:app:name:ipad" content="twitter_app" />
+<meta name="twitter:app:name:googleplay" content="twitter_app" />
+viewport
+  
+    
+    
+  
+
+
+Deprecated: The viewport option in metadata is deprecated as of Next.js 14. Please use the viewport configuration instead.
+
+verification
+  
+    
+    
+  
+
+layout.js | page.jsexport const metadata = {
+  verification: {
+    google: 'google',
+    yandex: 'yandex',
+    yahoo: 'yahoo',
+    other: {
+      me: ['my-email', 'my-link'],
+    },
+  },
+}
+<head> output<meta name="google-site-verification" content="google" />
+<meta name="y_key" content="yahoo" />
+<meta name="yandex-verification" content="yandex" />
+<meta name="me" content="my-email" />
+<meta name="me" content="my-link" />
+appleWebApp
+  
+    
+    
+  
+
+layout.js | page.jsexport const metadata = {
+  itunes: {
+    appId: 'myAppStoreID',
+    appArgument: 'myAppArgument',
+  },
+  appleWebApp: {
+    title: 'Apple Web App',
+    statusBarStyle: 'black-translucent',
+    startupImage: [
+      '/assets/startup/apple-touch-startup-image-768x1004.png',
+      {
+        url: '/assets/startup/apple-touch-startup-image-1536x2008.png',
+        media: '(device-width: 768px) and (device-height: 1024px)',
+      },
+    ],
+  },
+}
+<head> output<meta
+  name="apple-itunes-app"
+  content="app-id=myAppStoreID, app-argument=myAppArgument"
+/>
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Apple Web App" />
+<link
+  href="/assets/startup/apple-touch-startup-image-768x1004.png"
+  rel="apple-touch-startup-image"
+/>
+<link
+  href="/assets/startup/apple-touch-startup-image-1536x2008.png"
+  media="(device-width: 768px) and (device-height: 1024px)"
+  rel="apple-touch-startup-image"
+/>
+<meta
+  name="apple-mobile-web-app-status-bar-style"
+  content="black-translucent"
+/>
+alternates
+  
+    
+    
+  
+
+layout.js | page.jsexport const metadata = {
+  alternates: {
+    canonical: 'https://nextjs.org',
+    languages: {
+      'en-US': 'https://nextjs.org/en-US',
+      'de-DE': 'https://nextjs.org/de-DE',
+    },
+    media: {
+      'only screen and (max-width: 600px)': 'https://nextjs.org/mobile',
+    },
+    types: {
+      'application/rss+xml': 'https://nextjs.org/rss',
+    },
+  },
+}
+<head> output<link rel="canonical" href="https://nextjs.org" />
+<link rel="alternate" hreflang="en-US" href="https://nextjs.org/en-US" />
+<link rel="alternate" hreflang="de-DE" href="https://nextjs.org/de-DE" />
+<link
+  rel="alternate"
+  media="only screen and (max-width: 600px)"
+  href="https://nextjs.org/mobile"
+/>
+<link
+  rel="alternate"
+  type="application/rss+xml"
+  href="https://nextjs.org/rss"
+/>
+appLinks
+  
+    
+    
+  
+
+layout.js | page.jsexport const metadata = {
+  appLinks: {
+    ios: {
+      url: 'https://nextjs.org/ios',
+      app_store_id: 'app_store_id',
+    },
+    android: {
+      package: 'com.example.android/package',
+      app_name: 'app_name_android',
+    },
+    web: {
+      url: 'https://nextjs.org/web',
+      should_fallback: true,
+    },
+  },
+}
+<head> output<meta property="al:ios:url" content="https://nextjs.org/ios" />
+<meta property="al:ios:app_store_id" content="app_store_id" />
+<meta property="al:android:package" content="com.example.android/package" />
+<meta property="al:android:app_name" content="app_name_android" />
+<meta property="al:web:url" content="https://nextjs.org/web" />
+<meta property="al:web:should_fallback" content="true" />
+archives
+  
+    
+    
+  
+
+Describes a collection of records, documents, or other materials of historical interest (source).
+layout.js | page.jsexport const metadata = {
+  archives: ['https://nextjs.org/13'],
+}
+<head> output<link rel="archives" href="https://nextjs.org/13" />
+assets
+  
+    
+    
+  
+
+layout.js | page.jsexport const metadata = {
+  assets: ['https://nextjs.org/assets'],
+}
+<head> output<link rel="assets" href="https://nextjs.org/assets" />
+bookmarks
+  
+    
+    
+  
+
+layout.js | page.jsexport const metadata = {
+  bookmarks: ['https://nextjs.org/13'],
+}
+<head> output<link rel="bookmarks" href="https://nextjs.org/13" />
+category
+  
+    
+    
+  
+
+layout.js | page.jsexport const metadata = {
+  category: 'technology',
+}
+<head> output<meta name="category" content="technology" />
+other
+  
+    
+    
+  
+
+All metadata options should be covered using the built-in support. However, there may be custom metadata tags specific to your site, or brand new metadata tags just released. You can use the other option to render any custom metadata tag.
+layout.js | page.jsexport const metadata = {
+  other: {
+    custom: 'meta',
+  },
+}
+<head> output<meta name="custom" content="meta" />
+If you want to generate multiple same key meta tags you can use array value.
+layout.js | page.jsexport const metadata = {
+  other: {
+    custom: ['meta1', 'meta2'],
+  },
+}
+<head> output<meta name="custom" content="meta1" /> <meta name="custom" content="meta2" />
+Unsupported Metadata
+  
+    
+    
+  
+
+The following metadata types do not currently have built-in support. However, they can still be rendered in the layout or page itself.
+MetadataRecommendation<meta http-equiv="...">Use appropriate HTTP Headers via redirect(), Middleware, Security Headers<base>Render the tag in the layout or page itself.<noscript>Render the tag in the layout or page itself.<style>Learn more about styling in Next.js.<script>Learn more about using scripts.<link rel="stylesheet" />import stylesheets directly in the layout or page itself.<link rel="preload />Use ReactDOM preload method<link rel="preconnect" />Use ReactDOM preconnect method<link rel="dns-prefetch" />Use ReactDOM prefetchDNS method
+Resource hints
+  
+    
+    
+  
+
+The <link> element has a number of rel keywords that can be used to hint to the browser that an external resource is likely to be needed. The browser uses this information to apply preloading optimizations depending on the keyword.
+While the Metadata API doesn't directly support these hints, you can use new ReactDOM methods to safely insert them into the <head> of the document.
+app/preload-resources.tsxTypeScript'use client'
+ 
+import ReactDOM from 'react-dom'
+ 
+export function PreloadResources() {
+  ReactDOM.preload('...', { as: '...' })
+  ReactDOM.preconnect('...', { crossOrigin: '...' })
+  ReactDOM.prefetchDNS('...')
+ 
+  return null
+}
+
+<link rel="preload">
+  
+    
+    
+  
+
+Start loading a resource early in the page rendering (browser) lifecycle. MDN Docs.
+ReactDOM.preload(href: string, options: { as: string })
+<head> output<link rel="preload" href="..." as="..." />
+<link rel="preconnect">
+  
+    
+    
+  
+
+Preemptively initiate a connection to an origin. MDN Docs.
+ReactDOM.preconnect(href: string, options?: { crossOrigin?: string })
+<head> output<link rel="preconnect" href="..." crossorigin />
+<link rel="dns-prefetch">
+  
+    
+    
+  
+
+Attempt to resolve a domain name before resources get requested. MDN Docs.
+ReactDOM.prefetchDNS(href: string)
+<head> output<link rel="dns-prefetch" href="..." />
+
+Good to know:
+
+These methods are currently only supported in Client Components, which are still Server Side Rendered on initial page load.
+Next.js in-built features such as next/font, next/image and next/script automatically handle relevant resource hints.
+React 18.3 does not yet include type definitions for ReactDOM.preload, ReactDOM.preconnect, and ReactDOM.preconnectDNS. You can use // @ts-ignore as a temporary solution to avoid type errors.
+
+
+Types
+  
+    
+    
+  
+
+You can add type safety to your metadata by using the Metadata type. If you are using the built-in TypeScript plugin in your IDE, you do not need to manually add the type, but you can still explicitly add it if you want.
+metadata object
+  
+    
+    
+  
+
+import type { Metadata } from 'next'
+ 
+export const metadata: Metadata = {
+  title: 'Next.js',
+}
+generateMetadata function
+  
+    
+    
+  
+
+Regular function
+  
+    
+    
+  
+
+import type { Metadata } from 'next'
+ 
+export function generateMetadata(): Metadata {
+  return {
+    title: 'Next.js',
+  }
+}
+Async function
+  
+    
+    
+  
+
+import type { Metadata } from 'next'
+ 
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    title: 'Next.js',
+  }
+}
+With segment props
+  
+    
+    
+  
+
+import type { Metadata } from 'next'
+ 
+type Props = {
+  params: { id: string }
+  searchParams: { [key: string]: string | string[] | undefined }
+}
+ 
+export function generateMetadata({ params, searchParams }: Props): Metadata {
+  return {
+    title: 'Next.js',
+  }
+}
+ 
+export default function Page({ params, searchParams }: Props) {}
+With parent metadata
+  
+    
+    
+  
+
+import type { Metadata, ResolvingMetadata } from 'next'
+ 
+export async function generateMetadata(
+  { params, searchParams }: Props,
+  parent: ResolvingMetadata
+): Promise<Metadata> {
+  return {
+    title: 'Next.js',
+  }
+}
+JavaScript Projects
+  
+    
+    
+  
+
+For JavaScript projects, you can use JSDoc to add type safety.
+/** @type {import("next").Metadata} */
+export const metadata = {
+  title: 'Next.js',
+}
+Version History
+  
+    
+    
+  
+
+VersionChangesv13.2.0viewport, themeColor, and colorScheme deprecated in favor of the viewport configuration.v13.2.0metadata and generateMetadata introduced.
+generateSitemapsYou can use the generateSiteMaps function to generate multiple sitemaps for your application.
+Returns
+  
+    
+    
+  
+
+The generateSitemaps returns an array of objects with an id property.
+URLs
+  
+    
+    
+  
+
+In production, your generated sitemaps will be available at /.../sitemap/[id].xml. For example, /product/sitemap/1.xml.
+In development, you can view the generated sitemap on /.../sitemap.xml/[id]. For example, /product/sitemap.xml/1. This difference is temporary and will follow the production format.
+Example
+  
+    
+    
+  
+
+For example, to split a sitemap using generateSitemaps, return an array of objects with the sitemap id. Then, use the id to generate the unique sitemaps.
+app/product/sitemap.tsTypeScriptimport { BASE_URL } from '@/app/lib/constants'
+ 
+export async function generateSitemaps() {
+  // Fetch the total number of products and calculate the number of sitemaps needed
+  return [{ id: 0 }, { id: 1 }, { id: 2 }, { id: 3 }]
+}
+ 
+export default async function sitemap({
+  id,
+}: {
+  id: number
+}): MetadataRoute.Sitemap {
+  // Google's limit is 50,000 URLs per sitemap
+  const start = id * 50000
+  const end = start + 50000
+  const products = await getProducts(
+    `SELECT id, date FROM products WHERE id BETWEEN ${start} AND ${end}`
+  )
+  return products.map((product) => ({
+    url: `${BASE_URL}/product/${product.id}`
+    lastModified: product.date,
+  }))
+}
+
+generateStaticParamsThe generateStaticParams function can be used in combination with dynamic route segments to statically generate routes at build time instead of on-demand at request time.
+app/blog/[slug]/page.js// Return a list of `params` to populate the [slug] dynamic segment
+export async function generateStaticParams() {
+  const posts = await fetch('https://.../posts').then((res) => res.json())
+ 
+  return posts.map((post) => ({
+    slug: post.slug,
+  }))
+}
+ 
+// Multiple versions of this page will be statically generated
+// using the `params` returned by `generateStaticParams`
+export default function Page({ params }) {
+  const { slug } = params
+  // ...
+}
+
+Good to know
+
+You can use the dynamicParams segment config option to control what happens when a dynamic segment is visited that was not generated with generateStaticParams.
+During next dev, generateStaticParams will be called when you navigate to a route.
+During next build, generateStaticParams runs before the corresponding Layouts or Pages are generated.
+During revalidation (ISR), generateStaticParams will not be called again.
+generateStaticParams replaces the getStaticPaths function in the Pages Router.
+
+
+Parameters
+  
+    
+    
+  
+
+options.params (optional)
+If multiple dynamic segments in a route use generateStaticParams, the child generateStaticParams function is executed once for each set of params the parent generates.
+The params object contains the populated params from the parent generateStaticParams, which can be used to generate the params in a child segment.
+Returns
+  
+    
+    
+  
+
+generateStaticParams should return an array of objects where each object represents the populated dynamic segments of a single route.
+
+Each property in the object is a dynamic segment to be filled in for the route.
+The properties name is the segment's name, and the properties value is what that segment should be filled in with.
+
+Example RoutegenerateStaticParams Return Type/product/[id]{ id: string }[]/products/[category]/[product]{ category: string, product: string }[]/products/[...slug]{ slug: string[] }[]
+Single Dynamic Segment
+  
+    
+    
+  
+
+app/product/[id]/page.tsxTypeScriptexport function generateStaticParams() {
+  return [{ id: '1' }, { id: '2' }, { id: '3' }]
+}
+ 
+// Three versions of this page will be statically generated
+// using the `params` returned by `generateStaticParams`
+// - /product/1
+// - /product/2
+// - /product/3
+export default function Page({ params }: { params: { id: string } }) {
+  const { id } = params
+  // ...
+}
+
+Multiple Dynamic Segments
+  
+    
+    
+  
+
+app/products/[category]/[product]/page.tsxTypeScriptexport function generateStaticParams() {
+  return [
+    { category: 'a', product: '1' },
+    { category: 'b', product: '2' },
+    { category: 'c', product: '3' },
+  ]
+}
+ 
+// Three versions of this page will be statically generated
+// using the `params` returned by `generateStaticParams`
+// - /products/a/1
+// - /products/b/2
+// - /products/c/3
+export default function Page({
+  params,
+}: {
+  params: { category: string; product: string }
+}) {
+  const { category, product } = params
+  // ...
+}
+
+Catch-all Dynamic Segment
+  
+    
+    
+  
+
+app/product/[...slug]/page.tsxTypeScriptexport function generateStaticParams() {
+  return [{ slug: ['a', '1'] }, { slug: ['b', '2'] }, { slug: ['c', '3'] }]
+}
+ 
+// Three versions of this page will be statically generated
+// using the `params` returned by `generateStaticParams`
+// - /product/a/1
+// - /product/b/2
+// - /product/c/3
+export default function Page({ params }: { params: { slug: string[] } }) {
+  const { slug } = params
+  // ...
+}
+
+Examples
+  
+    
+    
+  
+
+Multiple Dynamic Segments in a Route
+  
+    
+    
+  
+
+You can generate params for dynamic segments above the current layout or page, but not below. For example, given the app/products/[category]/[product] route:
+
+app/products/[category]/[product]/page.js can generate params for both [category] and [product].
+app/products/[category]/layout.js can only generate params for [category].
+
+There are two approaches to generating params for a route with multiple dynamic segments:
+Generate params from the bottom up
+  
+    
+    
+  
+
+Generate multiple dynamic segments from the child route segment.
+app/products/[category]/[product]/page.tsxTypeScript// Generate segments for both [category] and [product]
+export async function generateStaticParams() {
+  const products = await fetch('https://.../products').then((res) => res.json())
+ 
+  return products.map((product) => ({
+    category: product.category.slug,
+    product: product.id,
+  }))
+}
+ 
+export default function Page({
+  params,
+}: {
+  params: { category: string; product: string }
+}) {
+  // ...
+}
+
+Generate params from the top down
+  
+    
+    
+  
+
+Generate the parent segments first and use the result to generate the child segments.
+app/products/[category]/layout.tsxTypeScript// Generate segments for [category]
+export async function generateStaticParams() {
+  const products = await fetch('https://.../products').then((res) => res.json())
+ 
+  return products.map((product) => ({
+    category: product.category.slug,
+  }))
+}
+ 
+export default function Layout({ params }: { params: { category: string } }) {
+  // ...
+}
+
+A child route segment's generateStaticParams function is executed once for each segment a parent generateStaticParams generates.
+The child generateStaticParams function can use the params returned from the parent generateStaticParams function to dynamically generate its own segments.
+app/products/[category]/[product]/page.tsxTypeScript// Generate segments for [product] using the `params` passed from
+// the parent segment's `generateStaticParams` function
+export async function generateStaticParams({
+  params: { category },
+}: {
+  params: { category: string }
+}) {
+  const products = await fetch(
+    `https://.../products?category=${category}`
+  ).then((res) => res.json())
+ 
+  return products.map((product) => ({
+    product: product.id,
+  }))
+}
+ 
+export default function Page({
+  params,
+}: {
+  params: { category: string; product: string }
+}) {
+  // ...
+}
+
+
+Good to know: fetch requests are automatically memoized for the same data across all generate-prefixed functions, Layouts, Pages, and Server Components. React cache can be used if fetch is unavailable.
+
+Version History
+  
+    
+    
+  
+
+VersionChangesv13.0.0generateStaticParams introduced.
+generateViewportYou can customize the initial viewport of the page with the static viewport object or the dynamic generateViewport function.
+
+Good to know:
+
+The viewport object and generateViewport function exports are only supported in Server Components.
+You cannot export both the viewport object and generateViewport function from the same route segment.
+If you're coming from migrating metadata exports, you can use metadata-to-viewport-export codemod to update your changes.
+
+
+The viewport object
+  
+    
+    
+  
+
+To define the viewport options, export a viewport object from a layout.js or page.js file.
+layout.tsx | page.tsxTypeScriptimport type { Viewport } from 'next'
+ 
+export const viewport: Viewport = {
+  themeColor: 'black',
+}
+ 
+export default function Page() {}
+
+generateViewport function
+  
+    
+    
+  
+
+generateViewport should return a Viewport object containing one or more viewport fields.
+layout.tsx | page.tsxTypeScriptexport function generateViewport({ params }) {
+  return {
+    themeColor: '...',
+  }
+}
+
+
+Good to know:
+
+If the viewport doesn't depend on runtime information, it should be defined using the static viewport object rather than generateMetadata.
+
+
+Viewport Fields
+  
+    
+    
+  
+
+themeColor
+  
+    
+    
+  
+
+Learn more about theme-color.
+Simple theme color
+layout.js | page.jsexport const viewport = {
+  themeColor: 'black',
+}
+<head> output<meta name="theme-color" content="black" />
+With media attribute
+layout.js | page.jsexport const viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: 'cyan' },
+    { media: '(prefers-color-scheme: dark)', color: 'black' },
+  ],
+}
+<head> output<meta name="theme-color" media="(prefers-color-scheme: light)" content="cyan" />
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="black" />
+width, initialScale, and maximumScale
+  
+    
+    
+  
+
+
+Good to know: The viewport meta tag is automatically set with the following default values. Usually, manual configuration is unnecessary as the default is sufficient. However, the information is provided for completeness.
+
+layout.js | page.jsexport const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  // Also supported by less commonly used
+  // interactiveWidget: 'resizes-visual',
+}
+<head> output<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1, maximum-scale=1"
+/>
+colorScheme
+  
+    
+    
+  
+
+Learn more about color-scheme.
+layout.js | page.jsexport const viewport = {
+  colorScheme: 'dark',
+}
+<head> output<meta name="color-scheme" content="dark" />
+Types
+  
+    
+    
+  
+
+You can add type safety to your viewport object by using the Viewport type. If you are using the built-in TypeScript plugin in your IDE, you do not need to manually add the type, but you can still explicitly add it if you want.
+viewport object
+  
+    
+    
+  
+
+import type { Viewport } from 'next'
+ 
+export const viewport: Viewport = {
+  themeColor: 'black',
+}
+generateViewport function
+  
+    
+    
+  
+
+Regular function
+  
+    
+    
+  
+
+import type { Viewport } from 'next'
+ 
+export function generateViewport(): Viewport {
+  return {
+    themeColor: 'black',
+  }
+}
+With segment props
+  
+    
+    
+  
+
+import type { Viewport } from 'next'
+ 
+type Props = {
+  params: { id: string }
+  searchParams: { [key: string]: string | string[] | undefined }
+}
+ 
+export function generateViewport({ params, searchParams }: Props): Viewport {
+  return {
+    themeColor: 'black',
+  }
+}
+ 
+export default function Page({ params, searchParams }: Props) {}
+JavaScript Projects
+  
+    
+    
+  
+
+For JavaScript projects, you can use JSDoc to add type safety.
+/** @type {import("next").Viewport} */
+export const viewport = {
+  themeColor: 'black',
+}
+Version History
+  
+    
+    
+  
+
+VersionChangesv14.0.0viewport and generateViewport introduced.
+headersThe headers function allows you to read the HTTP incoming request headers from a Server Component.
+headers()
+  
+    
+    
+  
+
+This API extends the Web Headers API. It is read-only, meaning you cannot set / delete the outgoing request headers.
+app/page.tsxTypeScriptimport { headers } from 'next/headers'
+ 
+export default function Page() {
+  const headersList = headers()
+  const referer = headersList.get('referer')
+ 
+  return <div>Referer: {referer}</div>
+}
+
+
+Good to know:
+
+headers() is a Dynamic Function whose returned values cannot be known ahead of time. Using it in a layout or page will opt a route into dynamic rendering at request time.
+
+
+API Reference
+  
+    
+    
+  
+
+const headersList = headers()
+Parameters
+  
+    
+    
+  
+
+headers does not take any parameters.
+Returns
+  
+    
+    
+  
+
+headers returns a read-only Web Headers object.
+
+Headers.entries(): Returns an iterator allowing to go through all key/value pairs contained in this object.
+Headers.forEach(): Executes a provided function once for each key/value pair in this Headers object.
+Headers.get(): Returns a String sequence of all the values of a header within a Headers object with a given name.
+Headers.has(): Returns a boolean stating whether a Headers object contains a certain header.
+Headers.keys(): Returns an iterator allowing you to go through all keys of the key/value pairs contained in this object.
+Headers.values(): Returns an iterator allowing you to go through all values of the key/value pairs contained in this object.
+
+Examples
+  
+    
+    
+  
+
+Usage with Data Fetching
+  
+    
+    
+  
+
+headers() can be used in combination with Suspense for Data Fetching.
+app/page.jsimport { Suspense } from 'react'
+import { headers } from 'next/headers'
+ 
+async function User() {
+  const authorization = headers().get('authorization')
+  const res = await fetch('...', {
+    headers: { authorization }, // Forward the authorization header
+  })
+  const user = await res.json()
+ 
+  return <h1>{user.name}</h1>
+}
+ 
+export default function Page() {
+  return (
+    <Suspense fallback={null}>
+      <User />
+    </Suspense>
+  )
+}
+IP Address
+  
+    
+    
+  
+
+headers() can be used to get the IP address of the client.
+app/page.jsimport { Suspense } from 'react'
+import { headers } from 'next/headers'
+ 
+function IP() {
+  const FALLBACK_IP_ADDRESS = '0.0.0.0'
+  const forwardedFor = headers().get('x-forwarded-for')
+ 
+  if (forwardedFor) {
+    return forwardedFor.split(',')[0] ?? FALLBACK_IP_ADDRESS
+  }
+ 
+  return headers().get('x-real-ip') ?? FALLBACK_IP_ADDRESS
+}
+ 
+export default function Page() {
+  return (
+    <Suspense fallback={null}>
+      <IP />
+    </Suspense>
+  )
+}
+In addition to x-forwarded-for, headers() can also read:
+
+x-real-ip
+x-forwarded-host
+x-forwarded-port
+x-forwarded-proto
+
+Version History
+  
+    
+    
+  
+
+VersionChangesv13.0.0headers introduced.
+ImageResponseThe ImageResponse constructor allows you to generate dynamic images using JSX and CSS. This is useful for generating social media images such as Open Graph images, Twitter cards, and more.
+The following options are available for ImageResponse:
+import { ImageResponse } from 'next/og'
+ 
+new ImageResponse(
+  element: ReactElement,
+  options: {
+    width?: number = 1200
+    height?: number = 630
+    emoji?: 'twemoji' | 'blobmoji' | 'noto' | 'openmoji' = 'twemoji',
+    fonts?: {
+      name: string,
+      data: ArrayBuffer,
+      weight: number,
+      style: 'normal' | 'italic'
+    }[]
+    debug?: boolean = false
+ 
+    // Options that will be passed to the HTTP response
+    status?: number = 200
+    statusText?: string
+    headers?: Record<string, string>
+  },
+)
+Supported CSS Properties
+  
+    
+    
+  
+
+Please refer to Satori’s documentation for a list of supported HTML and CSS features.
+Version History
+  
+    
+    
+  
+
+VersionChangesv14.0.0ImageResponse moved from next/server to next/ogv13.3.0ImageResponse can be imported from next/server.v13.0.0ImageResponse introduced via @vercel/og package.
+NextRequest
+NextRequest extends the Web Request API with additional convenience methods.
+cookies
+  
+    
+    
+  
+
+Read or mutate the Set-Cookie header of the request.
+set(name, value)
+  
+    
+    
+  
+
+Given a name, set a cookie with the given value on the request.
+// Given incoming request /home
+// Set a cookie to hide the banner
+// request will have a `Set-Cookie:show-banner=false;path=/home` header
+request.cookies.set('show-banner', 'false')
+get(name)
+  
+    
+    
+  
+
+Given a cookie name, return the value of the cookie. If the cookie is not found, undefined is returned. If multiple cookies are found, the first one is returned.
+// Given incoming request /home
+// { name: 'show-banner', value: 'false', Path: '/home' }
+request.cookies.get('show-banner')
+getAll()
+  
+    
+    
+  
+
+Given a cookie name, return the values of the cookie. If no name is given, return all cookies on the request.
+// Given incoming request /home
+// [
+//   { name: 'experiments', value: 'new-pricing-page', Path: '/home' },
+//   { name: 'experiments', value: 'winter-launch', Path: '/home' },
+// ]
+request.cookies.getAll('experiments')
+// Alternatively, get all cookies for the request
+request.cookies.getAll()
+delete(name)
+  
+    
+    
+  
+
+Given a cookie name, delete the cookie from the request.
+// Returns true for deleted, false is nothing is deleted
+request.cookies.delete('experiments')
+has(name)
+  
+    
+    
+  
+
+Given a cookie name, return true if the cookie exists on the request.
+// Returns true if cookie exists, false if it does not
+request.cookies.has('experiments')
+clear()
+  
+    
+    
+  
+
+Remove the Set-Cookie header from the request.
+request.cookies.clear()
+nextUrl
+  
+    
+    
+  
+
+Extends the native URL API with additional convenience methods, including Next.js specific properties.
+// Given a request to /home, pathname is /home
+request.nextUrl.pathname
+// Given a request to /home?name=lee, searchParams is { 'name': 'lee' }
+request.nextUrl.searchParams
+The following options are available:
+
+PropertyTypeDescriptionbasePathstringThe base path of the URL.buildIdstring | undefinedThe build identifier of the Next.js application. Can be customized.urlURLThe URL object.pathnamestringThe pathname of the URL.searchParamsObjectThe search parameters of the URL.
+Note: The internationalization properties from the Pages Router are not available for usage in the App Router. Learn more about internationalization with the App Router.
+
+ip
+  
+    
+    
+  
+
+The ip property is a string that contains the IP address of the request. This value can optionally be provided by your hosting platform.
+
+Good to know: On Vercel, this value is provided by default. On other platforms, you can use the X-Forwarded-For header to provide the IP address.
+
+// Provided by Vercel
+request.ip
+// Self-hosting
+request.headers.get('X-Forwarded-For')
+geo
+  
+    
+    
+  
+
+The geo property is an object that contains the geographic information of the request. This value can optionally be provided by your hosting platform.
+
+Good to know: On Vercel, this value is provided by default. On other platforms, you can use the X-Forwarded-For header to provide the IP address, then use a third-party service to lookup the geographic information.
+
+// Provided by Vercel
+request.geo.city
+request.geo.country
+request.geo.region
+request.geo.latitude
+request.geo.longitude
+ 
+// Self-hosting
+function getGeo(request) {
+  let ip = request.headers.get('X-Forwarded-For')
+  // Use a third-party service to lookup the geographic information
+}
+Version History
+  
+    
+    
+  
+
+VersionChangesv13.0.0useSearchParams introduced.
+NextResponse
+NextResponse extends the Web Response API with additional convenience methods.
+cookies
+  
+    
+    
+  
+
+Read or mutate the Set-Cookie header of the response.
+set(name, value)
+  
+    
+    
+  
+
+Given a name, set a cookie with the given value on the response.
+// Given incoming request /home
+let response = NextResponse.next()
+// Set a cookie to hide the banner
+response.cookies.set('show-banner', 'false')
+// Response will have a `Set-Cookie:show-banner=false;path=/home` header
+return response
+get(name)
+  
+    
+    
+  
+
+Given a cookie name, return the value of the cookie. If the cookie is not found, undefined is returned. If multiple cookies are found, the first one is returned.
+// Given incoming request /home
+let response = NextResponse.next()
+// { name: 'show-banner', value: 'false', Path: '/home' }
+response.cookies.get('show-banner')
+getAll()
+  
+    
+    
+  
+
+Given a cookie name, return the values of the cookie. If no name is given, return all cookies on the response.
+// Given incoming request /home
+let response = NextResponse.next()
+// [
+//   { name: 'experiments', value: 'new-pricing-page', Path: '/home' },
+//   { name: 'experiments', value: 'winter-launch', Path: '/home' },
+// ]
+response.cookies.getAll('experiments')
+// Alternatively, get all cookies for the response
+response.cookies.getAll()
+delete(name)
+  
+    
+    
+  
+
+Given a cookie name, delete the cookie from the response.
+// Given incoming request /home
+let response = NextResponse.next()
+// Returns true for deleted, false is nothing is deleted
+response.cookies.delete('experiments')
+json()
+  
+    
+    
+  
+
+Produce a response with the given JSON body.
+app/api/route.tsTypeScriptimport { NextResponse } from 'next/server'
+ 
+export async function GET(request: Request) {
+  return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+}
+
+redirect()
+  
+    
+    
+  
+
+Produce a response that redirects to a URL.
+import { NextResponse } from 'next/server'
+ 
+return NextResponse.redirect(new URL('/new', request.url))
+The URL can be created and modified before being used in the NextResponse.redirect() method. For example, you can use the request.nextUrl property to get the current URL, and then modify it to redirect to a different URL.
+import { NextResponse } from 'next/server'
+ 
+// Given an incoming request...
+const loginUrl = new URL('/login', request.url)
+// Add ?from=/incoming-url to the /login URL
+loginUrl.searchParams.set('from', request.nextUrl.pathname)
+// And redirect to the new URL
+return NextResponse.redirect(loginUrl)
+rewrite()
+  
+    
+    
+  
+
+Produce a response that rewrites (proxies) the given URL while preserving the original URL.
+import { NextResponse } from 'next/server'
+ 
+// Incoming request: /about, browser shows /about
+// Rewritten request: /proxy, browser shows /about
+return NextResponse.rewrite(new URL('/proxy', request.url))
+next()
+  
+    
+    
+  
+
+The next() method is useful for Middleware, as it allows you to return early and continue routing.
+import { NextResponse } from 'next/server'
+ 
+return NextResponse.next()
+You can also forward headers when producing the response:
+import { NextResponse } from 'next/server'
+ 
+// Given an incoming request...
+const newHeaders = new Headers(request.headers)
+// Add a new header
+newHeaders.set('x-version', '123')
+// And produce a response with the new headers
+return NextResponse.next({
+  request: {
+    // New request headers
+    headers: newHeaders,
+  },
+})
+notFoundThe notFound function allows you to render the not-found file within a route segment as well as inject a <meta name="robots" content="noindex" /> tag.
+notFound()
+  
+    
+    
+  
+
+Invoking the notFound() function throws a NEXT_NOT_FOUND error and terminates rendering of the route segment in which it was thrown. Specifying a not-found file allows you to gracefully handle such errors by rendering a Not Found UI within the segment.
+app/user/[id]/page.jsimport { notFound } from 'next/navigation'
+ 
+async function fetchUser(id) {
+  const res = await fetch('https://...')
+  if (!res.ok) return undefined
+  return res.json()
+}
+ 
+export default async function Profile({ params }) {
+  const user = await fetchUser(params.id)
+ 
+  if (!user) {
+    notFound()
+  }
+ 
+  // ...
+}
+
+Good to know: notFound() does not require you to use return notFound() due to using the TypeScript never type.
+
+Version History
+  
+    
+    
+  
+
+VersionChangesv13.0.0notFound introduced.
+permanentRedirectThe permanentRedirect function allows you to redirect the user to another URL. permanentRedirect can be used in Server Components, Client Components, Route Handlers, and Server Actions.
+When used in a streaming context, this will insert a meta tag to emit the redirect on the client side. When used in a server action, it will serve a 303 HTTP redirect response to the caller. Otherwise, it will serve a 308 (Permanent) HTTP redirect response to the caller.
+If a resource doesn't exist, you can use the notFound function instead.
+
+Good to know: If you prefer to return a 307 (Temporary) HTTP redirect instead of 308 (Permanent), you can use the redirect function instead.
+
+Parameters
+  
+    
+    
+  
+
+The permanentRedirect function accepts two arguments:
+permanentRedirect(path, type)
+ParameterTypeDescriptionpathstringThe URL to redirect to. Can be a relative or absolute path.type'replace' (default) or 'push' (default in Server Actions)The type of redirect to perform.
+By default, permanentRedirect will use push (adding a new entry to the browser history stack) in Server Actions and replace (replacing the current URL in the browser history stack) everywhere else. You can override this behavior by specifying the type parameter.
+The type parameter has no effect when used in Server Components.
+Returns
+  
+    
+    
+  
+
+permanentRedirect does not return any value.
+Example
+  
+    
+    
+  
+
+Invoking the permanentRedirect() function throws a NEXT_REDIRECT error and terminates rendering of the route segment in which it was thrown.
+app/team/[id]/page.jsimport { permanentRedirect } from 'next/navigation'
+ 
+async function fetchTeam(id) {
+  const res = await fetch('https://...')
+  if (!res.ok) return undefined
+  return res.json()
+}
+ 
+export default async function Profile({ params }) {
+  const team = await fetchTeam(params.id)
+  if (!team) {
+    permanentRedirect('/login')
+  }
+ 
+  // ...
+}
+
+Good to know: permanentRedirect does not require you to use return permanentRedirect() as it uses the TypeScript never type.

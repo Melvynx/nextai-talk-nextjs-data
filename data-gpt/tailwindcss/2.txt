@@ -1,0 +1,1755 @@
+Often the biggest challenge when working with a framework is figuring out what you’re supposed to do when there’s something you need that the framework doesn’t handle for you.
+Tailwind has been designed from the ground up to be extensible and customizable, so that no matter what you’re building you never feel like you’re fighting the framework.
+This guide covers topics like customizing your design tokens, how to break out of those constraints when necessary, adding your own custom CSS, and extending the framework with plugins.
+​Customizing your theme
+If you want to change things like your color palette, spacing scale, typography scale, or breakpoints, add your customizations to the theme section of your tailwind.config.js file:
+tailwind.config.js/** @type {import('tailwindcss').Config} */
+module.exports = {
+  theme: {
+    screens: {
+      sm: '480px',
+      md: '768px',
+      lg: '976px',
+      xl: '1440px',
+    },
+    colors: {
+      'blue': '#1fb6ff',
+      'pink': '#ff49db',
+      'orange': '#ff7849',
+      'green': '#13ce66',
+      'gray-dark': '#273444',
+      'gray': '#8492a6',
+      'gray-light': '#d3dce6',
+    },
+    fontFamily: {
+      sans: ['Graphik', 'sans-serif'],
+      serif: ['Merriweather', 'serif'],
+    },
+    extend: {
+      spacing: {
+        '128': '32rem',
+        '144': '36rem',
+      },
+      borderRadius: {
+        '4xl': '2rem',
+      }
+    }
+  }
+}
+Learn more about customizing your theme in the Theme Configuration documentation.
+
+​Using arbitrary values
+While you can usually build the bulk of a well-crafted design using a constrained set of design tokens, once in a while you need to break out of those constraints to get things pixel-perfect.
+When you find yourself really needing something like top: 117px to get a background image in just the right spot, use Tailwind’s square bracket notation to generate a class on the fly with any arbitrary value:
+<div class="top-[117px]">
+  <!-- ... -->
+</div>
+This is basically like inline styles, with the major benefit that you can combine it with interactive modifiers like hover and responsive modifiers like lg:
+<div class="top-[117px] lg:top-[344px]">
+  <!-- ... -->
+</div>
+This works for everything in the framework, including things like background colors, font sizes, pseudo-element content, and more:
+<div class="bg-[#bada55] text-[22px] before:content-['Festivus']">
+  <!-- ... -->
+</div>
+It’s even possible to use the theme function to reference the design tokens in your tailwind.config.js file:
+<div class="grid grid-cols-[fit-content(theme(spacing.32))]">
+  <!-- ... -->
+</div>
+When using a CSS variable as an arbitrary value, wrapping your variable in var(...) isn’t needed — just providing the actual variable name is enough:
+<div class="bg-[--my-color]">
+  <!-- ... -->
+</div>
+​Arbitrary properties
+If you ever need to use a CSS property that Tailwind doesn’t include a utility for out of the box, you can also use square bracket notation to write completely arbitrary CSS:
+<div class="[mask-type:luminance]">
+  <!-- ... -->
+</div>
+This is really like inline styles, but again with the benefit that you can use modifiers:
+<div class="[mask-type:luminance] hover:[mask-type:alpha]">
+  <!-- ... -->
+</div>
+This can be useful for things like CSS variables as well, especially when they need to change under different conditions:
+<div class="[--scroll-offset:56px] lg:[--scroll-offset:44px]">
+  <!-- ... -->
+</div>
+​Arbitrary variants
+Arbitrary variants are like arbitrary values but for doing on-the-fly selector modification, like you can with built-in pseudo-class variants like hover:{utility} or responsive variants like md:{utility} but using square bracket notation directly in your HTML.
+HTMLGenerated CSS<ul role="list">
+  {#each items as item}
+    <li class="lg:[&:nth-child(3)]:hover:underline">{item}</li>
+  {/each}
+</ul>
+Learn more in the arbitrary variants documentation.
+​Handling whitespace
+When an arbitrary value needs to contain a space, use an underscore (_) instead and Tailwind will automatically convert it to a space at build-time:
+<div class="grid grid-cols-[1fr_500px_2fr]">
+  <!-- ... -->
+</div>
+In situations where underscores are common but spaces are invalid, Tailwind will preserve the underscore instead of converting it to a space, for example in URLs:
+<div class="bg-[url('/what_a_rush.png')]">
+  <!-- ... -->
+</div>
+In the rare case that you actually need to use an underscore but it’s ambiguous because a space is valid as well, escape the underscore with a backslash and Tailwind won’t convert it to a space:
+<div class="before:content-['hello\_world']">
+  <!-- ... -->
+</div>
+If you’re using something like JSX where the backslash is stripped from the rendered HTML, use String.raw() so the backslash isn’t treated as a JavaScript escape character:
+<div className={String.raw`before:content-['hello\_world']`}>
+  <!-- ... -->
+</div>
+​Resolving ambiguities
+Many utilities in Tailwind share a common namespace but map to different CSS properties. For example text-lg and text-black both share the text- namespace, but one is for font-size and the other is for color.
+When using arbitrary values, Tailwind can generally handle this ambiguity automatically based on the value you pass in:
+<!-- Will generate a font-size utility -->
+<div class="text-[22px]">...</div>
+
+<!-- Will generate a color utility -->
+<div class="text-[#bada55]">...</div>
+Sometimes it really is ambiguous though, for example when using CSS variables:
+<div class="text-[var(--my-var)]">...</div>
+In these situations, you can “hint” the underlying type to Tailwind by adding a CSS data type before the value:
+<!-- Will generate a font-size utility -->
+<div class="text-[length:var(--my-var)]">...</div>
+
+<!-- Will generate a color utility -->
+<div class="text-[color:var(--my-var)]">...</div>
+
+​Using CSS and @layer
+When you need to add truly custom CSS rules to a Tailwind project, the easiest approach is to just add the custom CSS to your stylesheet:
+main.css@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.my-custom-style {
+  /* ... */
+}
+For more power, you can also use the @layer directive to add styles to Tailwind’s base, components, and utilities layers:
+main.css@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .my-custom-style {
+    /* ... */
+  }
+}
+Why does Tailwind group styles into “layers”?In CSS, the order of the rules in your stylesheet decides which declaration wins when two selectors have the same specificity:.btn {
+  background: blue;
+  /* ... */
+}
+
+.bg-black {
+  background: black;
+}Here, both buttons will be black since .bg-black comes after .btn in the CSS:<button class="btn bg-black">...</button>
+<button class="bg-black btn">...</button>To manage this, Tailwind organizes the styles it generates into three different “layers” — a concept popularized by ITCSS.
+The base layer is for things like reset rules or default styles applied to plain HTML elements.
+The components layer is for class-based styles that you want to be able to override with utilities.
+The utilities layer is for small, single-purpose classes that should always take precedence over any other styles.
+Being explicit about this makes it easier to understand how your styles will interact with each other, and using the @layer directive lets you control the final declaration order while still organizing your actual code in whatever way you like.
+The @layer directive helps you control declaration order by automatically relocating your styles to the corresponding @tailwind directive, and also enables features like modifiers and tree-shaking for your own custom CSS.
+​Adding base styles
+If you just want to set some defaults for the page (like the text color, background color, or font family), the easiest option is just adding some classes to the html or body elements:
+<!doctype html>
+<html lang="en" class="text-gray-900 bg-gray-100 font-serif">
+  <!-- ... -->
+</html>
+This keeps your base styling decisions in your markup alongside all of your other styles, instead of hiding them in a separate file.
+If you want to add your own default base styles for specific HTML elements, use the @layer directive to add those styles to Tailwind’s base layer:
+main.css@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  h1 {
+    @apply text-2xl;
+  }
+  h2 {
+    @apply text-xl;
+  }
+  /* ... */
+}
+Use the theme function or @apply directive when adding custom base styles if you want to refer to any of the values defined in your theme.
+​Adding component classes
+Use the components layer for any more complicated classes you want to add to your project that you’d still like to be able to override with utility classes.
+Traditionally these would be classes like card, btn, badge — that kind of thing.
+main.css@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .card {
+    background-color: theme('colors.white');
+    border-radius: theme('borderRadius.lg');
+    padding: theme('spacing.6');
+    box-shadow: theme('boxShadow.xl');
+  }
+  /* ... */
+}
+By defining component classes in the components layer, you can still use utility classes to override them when necessary:
+<!-- Will look like a card, but with square corners -->
+<div class="card rounded-none">
+  <!-- ... -->
+</div>
+Using Tailwind you probably don’t need these types of classes as often as you think. Read our guide on Reusing Styles for our recommendations.
+The components layer is also a good place to put custom styles for any third-party components you’re using:
+main.css@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .select2-dropdown {
+    @apply rounded-b-lg shadow-md;
+  }
+  .select2-search {
+    @apply border border-gray-300 rounded;
+  }
+  .select2-results__group {
+    @apply text-lg font-bold text-gray-900;
+  }
+  /* ... */
+}
+Use the theme function or @apply directive when adding custom component styles if you want to refer to any of the values defined in your theme.
+​Adding custom utilities
+Add any of your own custom utility classes to Tailwind’s utilities layer:
+main.css@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .content-auto {
+    content-visibility: auto;
+  }
+}
+This can be useful when there’s a CSS feature you’d like to use in your project that Tailwind doesn’t include utilities for out of the box.
+​Using modifiers with custom CSS
+Any custom styles you add to Tailwind with @layer will automatically support Tailwind’s modifier syntax for handling things like hover states, responsive breakpoints, dark mode, and more.
+CSS@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .content-auto {
+    content-visibility: auto;
+  }
+}
+HTML<div class="lg:dark:content-auto">
+  <!-- ... -->
+</div>
+Learn more about how these modifiers work in the Hover, Focus, and Other States documentation.
+​Removing unused custom CSS
+Any custom styles you add to the base, components, or utilities layers will only be included in your compiled CSS if those styles are actually used in your HTML.
+main.css@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  /* This won't be included in your compiled CSS unless you actually use it */
+  .card {
+    /* ... */
+  }
+}
+If you want to add some custom CSS that should always be included, add it to your stylesheet without using the @layer directive:
+main.css@tailwind base;
+@tailwind components;
+
+/* This will always be included in your compiled CSS */
+.card {
+  /* ... */
+}
+
+@tailwind utilities;
+Make sure to put your custom styles where they need to go to get the precedence behavior you want. In the example above, we’ve added the .card class before @tailwind utilities to make sure utilities can still override it.
+​Using multiple CSS files
+If you are writing a lot of CSS and organizing it into multiple files, make sure those files are combined into a single stylesheet before processing them with Tailwind, or you’ll see errors about using @layer without the corresponding @tailwind directive.
+The easiest way to do this is using the postcss-import plugin:
+postcss.config.jsmodule.exports = {
+  plugins: {
+    'postcss-import': {},
+    tailwindcss: {},
+    autoprefixer: {},
+  }
+}
+
+Learn more in our build-time imports documentation.
+​Layers and per-component CSS
+Component frameworks like Vue and Svelte support adding per-component styles within a <style> block that lives in each component file.
+While you can use features like @apply and theme inside component styles like this, the @layer directive will not work and you’ll see an error about @layer being used without a matching @tailwind directive:
+Don’t use @layer in component styles
+Card.svelte<div>
+  <slot></slot>
+</div>
+
+<style>
+  /* Won't work because this file is processed in isolation */
+  @layer components {
+    div {
+      background-color: theme('colors.white');
+      border-radius: theme('borderRadius.lg');
+      padding: theme('spacing.6');
+      box-shadow: theme('boxShadow.xl');
+    }
+  }
+</style>
+This is because under-the-hood, frameworks like Vue and Svelte are processing every single <style> block independently, and running your PostCSS plugin chain against each one in isolation.
+That means if you have 10 components that each have a <style> block, Tailwind is being run 10 separate times, and each run has zero knowledge about the other runs. Because of this, Tailwind can’t take the styles you define in a @layer and move them to the corresponding @tailwind directive, because as far as Tailwind can tell there is no @tailwind directive to move it to.
+One solution to this is to simply not use @layer inside your component styles:
+Add your styles without using @layer
+Card.svelte<div>
+  <slot></slot>
+</div>
+
+<style>
+  div {
+    background-color: theme('colors.white');
+    border-radius: theme('borderRadius.lg');
+    padding: theme('spacing.6');
+    box-shadow: theme('boxShadow.xl');
+  }
+</style>
+You lose the ability to control the precedence of your styles, but unfortunately that’s totally out of our control because of how these tools work.
+Our recommendation is that you just don’t use component styles like this at all and instead use Tailwind the way it’s intended to be used — as a single global stylesheet where you use the classes directly in your HTML:
+Use Tailwind’s utilities instead of component styles
+Card.svelte<div class="bg-white rounded-lg p-6 shadow-xl">
+  <slot></slot>
+</div>
+
+​Writing plugins
+You can also add custom styles to your project using Tailwind’s plugin system instead of using a CSS file:
+tailwind.config.jsconst plugin = require('tailwindcss/plugin')
+
+module.exports = {
+  // ...
+  plugins: [
+    plugin(function ({ addBase, addComponents, addUtilities, theme }) {
+      addBase({
+        'h1': {
+          fontSize: theme('fontSize.2xl'),
+        },
+        'h2': {
+          fontSize: theme('fontSize.xl'),
+        },
+      })
+      addComponents({
+        '.card': {
+          backgroundColor: theme('colors.white'),
+          borderRadius: theme('borderRadius.lg'),
+          padding: theme('spacing.6'),
+          boxShadow: theme('boxShadow.xl'),
+        }
+      })
+      addUtilities({
+        '.content-auto': {
+          contentVisibility: 'auto',
+        }
+      })
+    })
+  ]
+}
+Learn more about writing your own plugins in the Plugins documentation.
+​Basic usage
+​Start
+Use content-start to pack rows in a container against the start of the cross axis:
+
+  
+    01
+    02
+    03
+    04
+    05
+  
+
+<div class="h-56 grid grid-cols-3 gap-4 content-start ...">
+  <div>01</div>
+  <div>02</div>
+  <div>03</div>
+  <div>04</div>
+  <div>05</div>
+</div>
+​Center
+Use content-center to pack rows in a container in the center of the cross axis:
+
+  
+    01
+    02
+    03
+    04
+    05
+  
+
+<div class="h-56 grid grid-cols-3 gap-4 content-center ...">
+  <div>01</div>
+  <div>02</div>
+  <div>03</div>
+  <div>04</div>
+  <div>05</div>
+</div>
+​End
+Use content-end to pack rows in a container against the end of the cross axis:
+
+  
+    01
+    02
+    03
+    04
+    05
+  
+
+<div class="h-56 grid grid-cols-3 gap-4 content-end ...">
+  <div>01</div>
+  <div>02</div>
+  <div>03</div>
+  <div>04</div>
+  <div>05</div>
+</div>
+​Space between
+Use content-between to distribute rows in a container such that there is an equal amount of space between each line:
+
+  
+    01
+    02
+    03
+    04
+    05
+  
+
+<div class="h-56 grid grid-cols-3 gap-4 content-between ...">
+  <div>01</div>
+  <div>02</div>
+  <div>03</div>
+  <div>04</div>
+  <div>05</div>
+</div>
+​Space around
+Use content-around to distribute rows in a container such that there is an equal amount of space around each line:
+
+  
+    01
+    02
+    03
+    04
+    05
+  
+
+<div class="h-56 grid grid-cols-3 gap-4 content-around ...">
+  <div>01</div>
+  <div>02</div>
+  <div>03</div>
+  <div>04</div>
+  <div>05</div>
+</div>
+​Space evenly
+Use content-evenly to distribute rows in a container such that there is an equal amount of space around each item, but also accounting for the doubling of space you would normally see between each item when using content-around:
+
+  
+    01
+    02
+    03
+    04
+    05
+  
+
+<div class="h-56 grid grid-cols-3 gap-4 content-evenly ...">
+  <div>01</div>
+  <div>02</div>
+  <div>03</div>
+  <div>04</div>
+  <div>05</div>
+</div>
+​Stretch
+Use content-stretch to allow content items to fill the available space along the container’s cross axis:
+
+  
+    01
+    02
+    03
+    04
+    05
+  
+
+<div class="h-56 grid grid-cols-3 gap-4 content-stretch ...">
+  <div>01</div>
+  <div>02</div>
+  <div>03</div>
+  <div>04</div>
+  <div>05</div>
+</div>
+​Normal
+Use content-normal to pack content items in their default position as if no align-content value was set:
+
+  
+    01
+    02
+    03
+    04
+    05
+  
+
+<div class="h-56 grid grid-cols-3 gap-4 content-normal ...">
+  <div>01</div>
+  <div>02</div>
+  <div>03</div>
+  <div>04</div>
+  <div>05</div>
+</div>
+
+​Applying conditionally
+​Hover, focus, and other states
+Tailwind lets you conditionally apply utility classes in different states using variant modifiers. For example, use hover:content-around to only apply the content-around utility on hover.<div class="grid content-start hover:content-around">
+  <!-- ... -->
+</div>
+For a complete list of all available state modifiers, check out the Hover, Focus, & Other States documentation.
+​Breakpoints and media queries
+You can also use variant modifiers to target media queries like responsive breakpoints, dark mode, prefers-reduced-motion, and more. For example, use md:content-around to apply the content-around utility at only medium screen sizes and above.<div class="grid content-start md:content-around">
+  <!-- ... -->
+</div>
+To learn more, check out the documentation on Responsive Design, Dark Mode and other media query modifiers.
+​Basic usage
+​Stretch
+Use items-stretch to stretch items to fill the container’s cross axis:
+
+  
+    01
+    02
+    03
+  
+
+<div class="flex items-stretch ...">
+  <div class="py-4">01</div>
+  <div class="py-12">02</div>
+  <div class="py-8">03</div>
+</div>
+​Start
+Use items-start to align items to the start of the container’s cross axis:
+
+  
+    01
+    02
+    03
+  
+
+<div class="flex items-start ...">
+  <div class="py-4">01</div>
+  <div class="py-12">02</div>
+  <div class="py-8">03</div>
+</div>
+​Center
+Use items-center to align items along the center of the container’s cross axis:
+
+  
+    01
+    02
+    03
+  
+
+<div class="flex items-center ...">
+  <div class="py-4">01</div>
+  <div class="py-12">02</div>
+  <div class="py-8">03</div>
+</div>
+​End
+Use items-end to align items to the end of the container’s cross axis:
+
+  
+    01
+    02
+    03
+  
+
+<div class="flex items-end ...">
+  <div class="py-4">01</div>
+  <div class="py-12">02</div>
+  <div class="py-8">03</div>
+</div>
+​Baseline
+Use items-baseline to align items along the container’s cross axis such that all of their baselines align:
+
+  
+    01
+    02
+    03
+  
+
+<div class="flex items-baseline ...">
+  <div class="pt-2 pb-6">01</div>
+  <div class="pt-8 pb-12">02</div>
+  <div class="pt-12 pb-4">03</div>
+</div>
+
+​Applying conditionally
+​Hover, focus, and other states
+Tailwind lets you conditionally apply utility classes in different states using variant modifiers. For example, use hover:items-center to only apply the items-center utility on hover.<div class="flex items-stretch hover:items-center">
+  <!-- ... -->
+</div>
+For a complete list of all available state modifiers, check out the Hover, Focus, & Other States documentation.
+​Breakpoints and media queries
+You can also use variant modifiers to target media queries like responsive breakpoints, dark mode, prefers-reduced-motion, and more. For example, use md:items-center to apply the items-center utility at only medium screen sizes and above.<div class="flex items-stretch md:items-center">
+  <!-- ... -->
+</div>
+To learn more, check out the documentation on Responsive Design, Dark Mode and other media query modifiers.
+​Basic usage
+​Auto
+Use self-auto to align an item based on the value of the container’s align-items property:
+
+  
+    01
+    02
+    03
+  
+
+<div class="flex items-stretch ...">
+  <div>01</div>
+  <div class="self-auto ...">02</div>
+  <div>03</div>
+</div>
+​Start
+Use self-start to align an item to the start of the container’s cross axis, despite the container’s align-items value:
+
+  
+    01
+    02
+    03
+  
+
+<div class="flex items-stretch ...">
+  <div>01</div>
+  <div class="self-start ...">02</div>
+  <div>03</div>
+</div>
+​Center
+Use self-center to align an item along the center of the container’s cross axis, despite the container’s align-items value:
+
+  
+    01
+    02
+    03
+  
+
+<div class="flex items-stretch ...">
+  <div>01</div>
+  <div class="self-center ...">02</div>
+  <div>03</div>
+</div>
+​End
+Use self-end to align an item to the end of the container’s cross axis, despite the container’s align-items value:
+
+  
+    01
+    02
+    03
+  
+
+<div class="flex items-stretch ...">
+  <div>01</div>
+  <div class="self-end ...">02</div>
+  <div>03</div>
+</div>
+​Stretch
+Use self-stretch to stretch an item to fill the container’s cross axis, despite the container’s align-items value:
+
+  
+    01
+    02
+    03
+  
+
+<div class="flex items-stretch ...">
+  <div>01</div>
+  <div class="self-stretch ...">02</div>
+  <div>03</div>
+</div>
+
+​Applying conditionally
+​Hover, focus, and other states
+Tailwind lets you conditionally apply utility classes in different states using variant modifiers. For example, use hover:self-end to only apply the self-end utility on hover.<div class="self-auto hover:self-end">
+  <!-- ... -->
+</div>
+For a complete list of all available state modifiers, check out the Hover, Focus, & Other States documentation.
+​Breakpoints and media queries
+You can also use variant modifiers to target media queries like responsive breakpoints, dark mode, prefers-reduced-motion, and more. For example, use md:self-end to apply the self-end utility at only medium screen sizes and above.<div class="self-auto md:self-end">
+  <!-- ... -->
+</div>
+To learn more, check out the documentation on Responsive Design, Dark Mode and other media query modifiers.
+​Basic usage
+​Spin
+Add the animate-spin utility to add a linear spin animation to elements like loading indicators.
+
+  
+    
+      
+      
+    
+    Processing...
+  
+
+<button type="button" class="bg-indigo-500 ..." disabled>
+  <svg class="animate-spin h-5 w-5 mr-3 ..." viewBox="0 0 24 24">
+    <!-- ... -->
+  </svg>
+  Processing...
+</button>
+​Ping
+Add the animate-ping utility to make an element scale and fade like a radar ping or ripple of water — useful for things like notification badges.
+
+  
+    
+      Transactions
+    
+    
+      
+      
+    
+  
+
+<span class="relative flex h-3 w-3">
+  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+  <span class="relative inline-flex rounded-full h-3 w-3 bg-sky-500"></span>
+</span>
+​Pulse
+Add the animate-pulse utility to make an element gently fade in and out — useful for things like skeleton loaders.
+
+  
+    
+      
+      
+        
+        
+          
+            
+            
+          
+          
+        
+      
+    
+  
+
+<div class="border border-blue-300 shadow rounded-md p-4 max-w-sm w-full mx-auto">
+  <div class="animate-pulse flex space-x-4">
+    <div class="rounded-full bg-slate-200 h-10 w-10"></div>
+    <div class="flex-1 space-y-6 py-1">
+      <div class="h-2 bg-slate-200 rounded"></div>
+      <div class="space-y-3">
+        <div class="grid grid-cols-3 gap-4">
+          <div class="h-2 bg-slate-200 rounded col-span-2"></div>
+          <div class="h-2 bg-slate-200 rounded col-span-1"></div>
+        </div>
+        <div class="h-2 bg-slate-200 rounded"></div>
+      </div>
+    </div>
+  </div>
+</div><div class="border border-blue-300 shadow rounded-md p-4 max-w-sm w-full mx-auto">
+  <div class="animate-pulse flex space-x-4">
+    <div class="rounded-full bg-slate-700 h-10 w-10"></div>
+    <div class="flex-1 space-y-6 py-1">
+      <div class="h-2 bg-slate-700 rounded"></div>
+      <div class="space-y-3">
+        <div class="grid grid-cols-3 gap-4">
+          <div class="h-2 bg-slate-700 rounded col-span-2"></div>
+          <div class="h-2 bg-slate-700 rounded col-span-1"></div>
+        </div>
+        <div class="h-2 bg-slate-700 rounded"></div>
+      </div>
+    </div>
+  </div>
+</div>
+​Bounce
+Add the animate-bounce utility to make an element bounce up and down — useful for things like “scroll down” indicators.
+
+  
+    
+      
+    
+  
+
+<svg class="animate-bounce w-6 h-6 ...">
+  <!-- ... -->
+</svg>
+​Prefers-reduced-motion
+For situations where the user has specified that they prefer reduced motion, you can conditionally apply animations and transitions using the motion-safe and motion-reduce variants:
+<button type="button" class="bg-indigo-600 ..." disabled>
+  <svg class="motion-safe:animate-spin h-5 w-5 mr-3 ..." viewBox="0 0 24 24">
+    <!-- ... -->
+  </svg>
+  Processing
+</button>
+
+​Applying conditionally
+​Hover, focus, and other states
+Tailwind lets you conditionally apply utility classes in different states using variant modifiers. For example, use hover:animate-spin to only apply the animate-spin utility on hover.<div class="hover:animate-spin">
+  <!-- ... -->
+</div>
+For a complete list of all available state modifiers, check out the Hover, Focus, & Other States documentation.
+​Breakpoints and media queries
+You can also use variant modifiers to target media queries like responsive breakpoints, dark mode, prefers-reduced-motion, and more. For example, use md:animate-spin to apply the animate-spin utility at only medium screen sizes and above.<div class="md:animate-spin">
+  <!-- ... -->
+</div>
+To learn more, check out the documentation on Responsive Design, Dark Mode and other media query modifiers.
+
+​Using custom values
+​Customizing your theme
+Animations by their very nature tend to be highly project-specific. The animations we include by default are best thought of as helpful examples, and you’re encouraged to customize your animations to better suit your needs.
+By default, Tailwind provides utilities for four different example animations, as well as the animate-none utility. You can customize these values by editing theme.animation or theme.extend.animation in your tailwind.config.js file.
+tailwind.config.jsmodule.exports = {
+  theme: {
+    extend: {
+      animation: {
+        'spin-slow': 'spin 3s linear infinite',
+      }
+    }
+  }
+}
+
+To add new animation @keyframes, use the keyframes section of your theme configuration:
+tailwind.config.jsmodule.exports = {
+  theme: {
+    extend: {
+      keyframes: {
+        wiggle: {
+          '0%, 100%': { transform: 'rotate(-3deg)' },
+          '50%': { transform: 'rotate(3deg)' },
+        }
+      }
+    }
+  }
+}
+
+You can then reference these keyframes by name in the animation section of your theme configuration:
+tailwind.config.jsmodule.exports = {
+  theme: {
+    extend: {
+      animation: {
+        wiggle: 'wiggle 1s ease-in-out infinite',
+      }
+    }
+  }
+}
+
+Learn more about customizing the default theme in the theme customization documentation.
+​Arbitrary values
+If you need to use a one-off animation value that doesn’t make sense to include in your theme, use square brackets to generate a property on the fly using any arbitrary value.<div class="animate-[wiggle_1s_ease-in-out_infinite]">
+  <!-- ... -->
+</div>
+Learn more about arbitrary value support in the arbitrary values documentation.
+​Basic usage
+​Removing default element appearance
+Use appearance-none to reset any browser specific styling on an element. This utility is often used when creating custom form components.
+
+  
+    
+      Yes
+      No
+      Maybe
+    
+    
+      Default browser styles applied
+    
+  
+  
+    
+      
+        
+      
+      
+        Yes
+        No
+        Maybe
+      
+    
+    
+      Remove default browser styles
+    
+  
+
+<select>
+  <option>Yes</option>
+  <option>No</option>
+  <option>Maybe</option>
+</select>
+
+<div class="grid">
+  <select class="appearance-none row-start-1 col-start-1 bg-slate-50 dark:bg-slate-800 ...">
+    <option>Yes</option>
+    <option>No</option>
+    <option>Maybe</option>
+  </select>
+  <svg class="pointer-events-none row-start-1 col-start-1 ...">
+    <!-- ... -->
+  </svg>
+</div>
+​Restoring the default element appearance
+Use appearance-auto to restore the default browser specific styling on an element. This is useful for reverting to the standard browser controls in certain accessibility modes.
+Try emulating `forced-colors: active` in your developer tools to see the difference
+  
+    
+      
+        
+        
+          
+        
+      
+      Falls back to default appearance
+    
+  
+  
+    
+      
+        
+        
+          
+        
+      
+      Keeps custom appearance
+    
+  
+
+<label>
+  <div>
+    <input type="checkbox" class="appearance-none forced-colors:appearance-auto ..." />
+    <svg class="invisible peer-checked:visible forced-colors:hidden ..." >
+      <!-- ... -->
+    </svg>
+  </div>
+  Falls back to default appearance
+</label>
+
+<label>
+  <div>
+    <input type="checkbox" class="appearance-none ..." />
+    <svg class="invisible peer-checked:visible ...">
+      <!-- ... -->
+    </svg>
+  </div>
+  Keeps custom appearance
+</label>
+​Applying conditionally
+​Hover, focus, and other states
+Tailwind lets you conditionally apply utility classes in different states using variant modifiers. For example, use hover:appearance-none to only apply the appearance-none utility on hover.<div class="appearance-auto hover:appearance-none">
+  <!-- ... -->
+</div>
+For a complete list of all available state modifiers, check out the Hover, Focus, & Other States documentation.
+​Breakpoints and media queries
+You can also use variant modifiers to target media queries like responsive breakpoints, dark mode, prefers-reduced-motion, and more. For example, use md:appearance-none to apply the appearance-none utility at only medium screen sizes and above.<div class="appearance-auto md:appearance-none">
+  <!-- ... -->
+</div>
+To learn more, check out the documentation on Responsive Design, Dark Mode and other media query modifiers.
+​Basic usage
+​Setting the aspect ratio
+Use the aspect-{ratio} utilities to set the desired aspect ratio of an element.
+
+<iframe class="w-full aspect-video ..." src="https://www.youtube.com/..."></iframe>
+Tailwind doesn’t include a large set of aspect ratio values out of the box since it’s easier to just use arbitrary values. See the arbitrary values section for more information.
+​Browser support
+The aspect-{ratio} utilities use the native aspect-ratio CSS property, which was not supported in Safari until version 15. Until Safari 15 is popularized, Tailwind’s aspect-ratio plugin is a good alternative.
+
+​Applying conditionally
+​Hover, focus, and other states
+Tailwind lets you conditionally apply utility classes in different states using variant modifiers. For example, use hover:aspect-square to only apply the aspect-square utility on hover.<iframe class="w-full aspect-video hover:aspect-square" src="https://www.youtube.com/..."></iframe>For a complete list of all available state modifiers, check out the Hover, Focus, & Other States documentation.
+​Breakpoints and media queries
+You can also use variant modifiers to target media queries like responsive breakpoints, dark mode, prefers-reduced-motion, and more. For example, use md:aspect-square to apply the aspect-square utility at only medium screen sizes and above.<iframe class="w-full aspect-video md:aspect-square" src="https://www.youtube.com/..."></iframe>To learn more, check out the documentation on Responsive Design, Dark Mode and other media query modifiers.
+
+​Using custom values
+​Customizing your theme
+By default, Tailwind provides a minimal set of aspect-ratio utilities. You can customize these values by editing theme.aspectRatio or theme.extend.aspectRatio in your tailwind.config.js file.
+tailwind.config.jsmodule.exports = {
+  theme: {
+    extend: {
+      aspectRatio: {
+        '4/3': '4 / 3',
+      },
+    }
+  }
+}
+
+Learn more about customizing the default theme in the theme customization documentation.
+​Arbitrary values
+If you need to use a one-off aspect-ratio value that doesn’t make sense to include in your theme, use square brackets to generate a property on the fly using any arbitrary value.<iframe class="w-full aspect-[4/3]" src="https://www.youtube.com/..."></iframe>Learn more about arbitrary value support in the arbitrary values documentation.
+​Basic usage
+​Blurring behind an element
+Use the backdrop-blur-{amount?} utilities to control an element’s backdrop blur.
+
+
+  
+    backdrop-blur-sm
+    
+      
+      
+      
+    
+  
+  
+    backdrop-blur-md
+    
+      
+      
+      
+    
+  
+  
+    backdrop-blur-xl
+    
+      
+      
+      
+    
+  
+
+
+<div class="backdrop-blur-sm bg-white/30 ...">
+  <!-- ... -->
+</div>
+<div class="backdrop-blur-md bg-white/30 ...">
+  <!-- ... -->
+</div>
+<div class="backdrop-blur-xl bg-white/30 ...">
+  <!-- ... -->
+</div>
+​Removing backdrop filters
+To remove all of the backdrop filters on an element at once, use the backdrop-filter-none utility:<div class="backdrop-blur-md backdrop-brightness-150 md:backdrop-filter-none">
+  <!-- ... -->
+</div>
+This can be useful when you want to remove backdrop filters conditionally, such as on hover or at a particular breakpoint.
+
+​Applying conditionally
+​Hover, focus, and other states
+Tailwind lets you conditionally apply utility classes in different states using variant modifiers. For example, use hover:backdrop-blur-lg to only apply the backdrop-blur-lg utility on hover.<div class="backdrop-blur-sm hover:backdrop-blur-lg">
+  <!-- ... -->
+</div>
+For a complete list of all available state modifiers, check out the Hover, Focus, & Other States documentation.
+​Breakpoints and media queries
+You can also use variant modifiers to target media queries like responsive breakpoints, dark mode, prefers-reduced-motion, and more. For example, use md:backdrop-blur-lg to apply the backdrop-blur-lg utility at only medium screen sizes and above.<div class="backdrop-blur-sm md:backdrop-blur-lg">
+  <!-- ... -->
+</div>
+To learn more, check out the documentation on Responsive Design, Dark Mode and other media query modifiers.
+
+​Using custom values
+​Customizing your theme
+By default, Tailwind includes a handful of general purpose backdrop-blur utilities. You can customize these values by editing theme.backdropBlur or theme.extend.backdropBlur in your tailwind.config.js file.
+tailwind.config.jsmodule.exports = {
+  theme: {
+    extend: {
+      backdropBlur: {
+        xs: '2px',
+      }
+    }
+  }
+}
+
+Learn more about customizing the default theme in the theme customization documentation.
+​Arbitrary values
+If you need to use a one-off backdrop-blur value that doesn’t make sense to include in your theme, use square brackets to generate a property on the fly using any arbitrary value.<div class="backdrop-blur-[2px]">
+  <!-- ... -->
+</div>
+Learn more about arbitrary value support in the arbitrary values documentation.
+​Basic usage
+​Controlling backdrop brightness
+Use the backdrop-brightness-{amount?} utilities to control an element’s backdrop brightness.
+
+
+  
+    backdrop-brightness-50
+    
+      
+      
+      
+    
+  
+  
+    backdrop-brightness-125
+    
+      
+      
+      
+    
+  
+  
+    backdrop-brightness-200
+    
+      
+      
+      
+    
+  
+
+
+<div class="backdrop-brightness-50 bg-white/30 ...">
+  <!-- ... -->
+</div>
+<div class="backdrop-brightness-125 bg-white/30 ...">
+  <!-- ... -->
+</div>
+<div class="backdrop-brightness-200 bg-white/30 ...">
+  <!-- ... -->
+</div>
+​Removing backdrop filters
+To remove all of the backdrop filters on an element at once, use the backdrop-filter-none utility:<div class="backdrop-blur-md backdrop-brightness-150 md:backdrop-filter-none">
+  <!-- ... -->
+</div>
+This can be useful when you want to remove backdrop filters conditionally, such as on hover or at a particular breakpoint.
+
+​Applying conditionally
+​Hover, focus, and other states
+Tailwind lets you conditionally apply utility classes in different states using variant modifiers. For example, use hover:backdrop-brightness-150 to only apply the backdrop-brightness-150 utility on hover.<div class="backdrop-brightness-110 hover:backdrop-brightness-150">
+  <!-- ... -->
+</div>
+For a complete list of all available state modifiers, check out the Hover, Focus, & Other States documentation.
+​Breakpoints and media queries
+You can also use variant modifiers to target media queries like responsive breakpoints, dark mode, prefers-reduced-motion, and more. For example, use md:backdrop-brightness-150 to apply the backdrop-brightness-150 utility at only medium screen sizes and above.<div class="backdrop-brightness-110 md:backdrop-brightness-150">
+  <!-- ... -->
+</div>
+To learn more, check out the documentation on Responsive Design, Dark Mode and other media query modifiers.
+
+​Using custom values
+​Customizing your theme
+By default, Tailwind includes a handful of general purpose backdrop-brightness utilities. You can customize these values by editing theme.backdropBrightness or theme.extend.backdropBrightness in your tailwind.config.js file.
+tailwind.config.jsmodule.exports = {
+  theme: {
+    extend: {
+      backdropBrightness: {
+        25: '.25',
+        175: '1.75',
+      }
+    }
+  }
+}
+
+Learn more about customizing the default theme in the theme customization documentation.
+​Arbitrary values
+If you need to use a one-off backdrop-brightness value that doesn’t make sense to include in your theme, use square brackets to generate a property on the fly using any arbitrary value.<div class="backdrop-brightness-[1.75]">
+  <!-- ... -->
+</div>
+Learn more about arbitrary value support in the arbitrary values documentation.
+​Basic usage
+​Controlling backdrop contrast
+Use the backdrop-contrast-{amount?} utilities to control an element’s backdrop contrast.
+
+
+  
+    backdrop-contrast-50
+    
+      
+      
+      
+    
+  
+  
+    backdrop-contrast-125
+    
+      
+      
+      
+    
+  
+  
+    backdrop-contrast-200
+    
+      
+      
+      
+    
+  
+
+
+<div class="backdrop-contrast-50 bg-white/30 ...">
+  <!-- ... -->
+</div>
+<div class="backdrop-contrast-125 bg-white/30 ...">
+  <!-- ... -->
+</div>
+<div class="backdrop-contrast-200 bg-white/30 ...">
+  <!-- ... -->
+</div>
+​Removing backdrop filters
+To remove all of the backdrop filters on an element at once, use the backdrop-filter-none utility:<div class="backdrop-blur-md backdrop-contrast-125 md:backdrop-filter-none">
+  <!-- ... -->
+</div>
+This can be useful when you want to remove backdrop filters conditionally, such as on hover or at a particular breakpoint.
+
+​Applying conditionally
+​Hover, focus, and other states
+Tailwind lets you conditionally apply utility classes in different states using variant modifiers. For example, use hover:backdrop-contrast-150 to only apply the backdrop-contrast-150 utility on hover.<div class="backdrop-contrast-125 hover:backdrop-contrast-150">
+  <!-- ... -->
+</div>
+For a complete list of all available state modifiers, check out the Hover, Focus, & Other States documentation.
+​Breakpoints and media queries
+You can also use variant modifiers to target media queries like responsive breakpoints, dark mode, prefers-reduced-motion, and more. For example, use md:backdrop-contrast-150 to apply the backdrop-contrast-150 utility at only medium screen sizes and above.<div class="backdrop-contrast-125 md:backdrop-contrast-150">
+  <!-- ... -->
+</div>
+To learn more, check out the documentation on Responsive Design, Dark Mode and other media query modifiers.
+
+​Using custom values
+​Customizing your theme
+By default, Tailwind includes a handful of general purpose backdrop-contrast utilities. You can customize these values by editing theme.backdropContrast or theme.extend.backdropContrast in your tailwind.config.js file.
+tailwind.config.jsmodule.exports = {
+  theme: {
+    extend: {
+      backdropContrast: {
+        25: '.25',
+      }
+    }
+  }
+}
+
+Learn more about customizing the default theme in the theme customization documentation.
+​Arbitrary values
+If you need to use a one-off backdrop-contrast value that doesn’t make sense to include in your theme, use square brackets to generate a property on the fly using any arbitrary value.<div class="backdrop-contrast-[.25]">
+  <!-- ... -->
+</div>
+Learn more about arbitrary value support in the arbitrary values documentation.
+​Basic usage
+​Making an element grayscale
+Use the backdrop-grayscale and backdrop-grayscale-0 utilities to control whether an element’s backdrop should be rendered as grayscale or in full color.
+
+
+  
+    backdrop-grayscale-0
+    
+      
+      
+      
+    
+  
+  
+    backdrop-grayscale
+    
+      
+      
+      
+    
+  
+
+
+<div class="backdrop-grayscale-0 bg-white/30 ...">
+  <!-- ... -->
+</div>
+<div class="backdrop-grayscale bg-white/30 ...">
+  <!-- ... -->
+</div>
+​Removing backdrop filters
+To remove all of the backdrop filters on an element at once, use the backdrop-filter-none utility:<div class="backdrop-blur-md backdrop-grayscale md:backdrop-filter-none">
+  <!-- ... -->
+</div>
+This can be useful when you want to remove backdrop filters conditionally, such as on hover or at a particular breakpoint.
+
+​Applying conditionally
+​Hover, focus, and other states
+Tailwind lets you conditionally apply utility classes in different states using variant modifiers. For example, use hover:backdrop-grayscale-0 to only apply the backdrop-grayscale-0 utility on hover.<div class="backdrop-grayscale hover:backdrop-grayscale-0">
+  <!-- ... -->
+</div>
+For a complete list of all available state modifiers, check out the Hover, Focus, & Other States documentation.
+​Breakpoints and media queries
+You can also use variant modifiers to target media queries like responsive breakpoints, dark mode, prefers-reduced-motion, and more. For example, use md:backdrop-grayscale-0 to apply the backdrop-grayscale-0 utility at only medium screen sizes and above.<div class="backdrop-grayscale md:backdrop-grayscale-0">
+  <!-- ... -->
+</div>
+To learn more, check out the documentation on Responsive Design, Dark Mode and other media query modifiers.
+
+​Using custom values
+​Customizing your theme
+By default, Tailwind includes a handful of general purpose backdrop-grayscale utilities. You can customize these values by editing theme.backdropGrayscale or theme.extend.backdropGrayscale in your tailwind.config.js file.
+tailwind.config.jsmodule.exports = {
+  theme: {
+    extend: {
+      backdropGrayscale: {
+        50: '.5',
+      }
+    }
+  }
+}
+
+Learn more about customizing the default theme in the theme customization documentation.
+​Arbitrary values
+If you need to use a one-off backdrop-grayscale value that doesn’t make sense to include in your theme, use square brackets to generate a property on the fly using any arbitrary value.<div class="backdrop-grayscale-[.5]">
+  <!-- ... -->
+</div>
+Learn more about arbitrary value support in the arbitrary values documentation.
+​Basic usage
+​Rotating the backdrop’s hue
+Use the backdrop-hue-rotate-{amount} utilities to rotate the hue of an element’s backdrop.
+
+
+  
+    backdrop-hue-rotate-90
+    
+      
+      
+      
+    
+  
+  
+    backdrop-hue-rotate-180
+    
+      
+      
+      
+    
+  
+  
+    -backdrop-hue-rotate-60
+    
+      
+      
+      
+    
+  
+
+
+<div class="backdrop-hue-rotate-90 bg-white/30 ...">
+  <!-- ... -->
+</div>
+<div class="backdrop-hue-rotate-180 bg-white/30 ...">
+  <!-- ... -->
+</div>
+<div class="-backdrop-hue-rotate-60 bg-white/30 ...">
+  <!-- ... -->
+</div>
+​Using negative values
+To use a negative backdrop hue rotate value, prefix the class name with a dash to convert it to a negative value.
+<div class="-backdrop-hue-rotate-60">
+  <!-- ... -->
+</div>
+​Removing backdrop filters
+To remove all of the backdrop filters on an element at once, use the backdrop-filter-none utility:<div class="backdrop-blur-md backdrop-hue-rotate-180 md:backdrop-filter-none">
+  <!-- ... -->
+</div>
+This can be useful when you want to remove backdrop filters conditionally, such as on hover or at a particular breakpoint.
+
+​Applying conditionally
+​Hover, focus, and other states
+Tailwind lets you conditionally apply utility classes in different states using variant modifiers. For example, use hover:backdrop-hue-rotate-60 to only apply the backdrop-hue-rotate-60 utility on hover.<div class="backdrop-hue-rotate-15 hover:backdrop-hue-rotate-60">
+  <!-- ... -->
+</div>
+For a complete list of all available state modifiers, check out the Hover, Focus, & Other States documentation.
+​Breakpoints and media queries
+You can also use variant modifiers to target media queries like responsive breakpoints, dark mode, prefers-reduced-motion, and more. For example, use md:backdrop-hue-rotate-60 to apply the backdrop-hue-rotate-60 utility at only medium screen sizes and above.<div class="backdrop-hue-rotate-15 md:backdrop-hue-rotate-60">
+  <!-- ... -->
+</div>
+To learn more, check out the documentation on Responsive Design, Dark Mode and other media query modifiers.
+
+​Using custom values
+​Customizing your theme
+By default, Tailwind includes a handful of general purpose backdrop-hue-rotate utilities. You can customize these values by editing theme.backdropHueRotate or theme.extend.backdropHueRotate in your tailwind.config.js file.
+tailwind.config.jsmodule.exports = {
+  theme: {
+    extend: {
+      backdropHueRotate: {
+        '-270': '-270deg',
+        270: '270deg',
+      }
+    }
+  }
+}
+
+Learn more about customizing the default theme in the theme customization documentation.
+​Arbitrary values
+If you need to use a one-off backdrop-hue-rotate value that doesn’t make sense to include in your theme, use square brackets to generate a property on the fly using any arbitrary value.<div class="backdrop-hue-rotate-[270deg]">
+  <!-- ... -->
+</div>
+Learn more about arbitrary value support in the arbitrary values documentation.
+​Basic usage
+​Inverting an element’s backdrop
+Use the backdrop-invert and backdrop-invert-0 utilities to control whether an element should be rendered with inverted backdrop colors or normally.
+
+
+  
+    backdrop-invert-0
+    
+      
+      
+      
+    
+  
+  
+    backdrop-invert
+    
+      
+      
+      
+    
+  
+
+
+<div class="backdrop-invert-0 bg-white/30 ...">
+  <!-- ... -->
+</div>
+<div class="backdrop-invert bg-white/30 ...">
+  <!-- ... -->
+</div>
+​Removing backdrop filters
+To remove all of the backdrop filters on an element at once, use the backdrop-filter-none utility:<div class="backdrop-blur-md backdrop-invert md:backdrop-filter-none">
+  <!-- ... -->
+</div>
+This can be useful when you want to remove backdrop filters conditionally, such as on hover or at a particular breakpoint.
+
+​Applying conditionally
+​Hover, focus, and other states
+Tailwind lets you conditionally apply utility classes in different states using variant modifiers. For example, use hover:backdrop-invert-0 to only apply the backdrop-invert-0 utility on hover.<div class="backdrop-invert hover:backdrop-invert-0">
+  <!-- ... -->
+</div>
+For a complete list of all available state modifiers, check out the Hover, Focus, & Other States documentation.
+​Breakpoints and media queries
+You can also use variant modifiers to target media queries like responsive breakpoints, dark mode, prefers-reduced-motion, and more. For example, use md:backdrop-invert-0 to apply the backdrop-invert-0 utility at only medium screen sizes and above.<div class="backdrop-invert md:backdrop-invert-0">
+  <!-- ... -->
+</div>
+To learn more, check out the documentation on Responsive Design, Dark Mode and other media query modifiers.
+
+​Using custom values
+​Customizing your theme
+By default, Tailwind includes a handful of general purpose backdrop-invert utilities. You can customize these values by editing theme.backdropInvert or theme.extend.backdropInvert in your tailwind.config.js file.
+tailwind.config.jsmodule.exports = {
+  theme: {
+    extend: {
+      backdropInvert: {
+        25: '.25',
+        75: '.75',
+      }
+    }
+  }
+}
+
+Learn more about customizing the default theme in the theme customization documentation.
+​Arbitrary values
+If you need to use a one-off backdrop-invert value that doesn’t make sense to include in your theme, use square brackets to generate a property on the fly using any arbitrary value.<div class="backdrop-invert-[.25]">
+  <!-- ... -->
+</div>
+Learn more about arbitrary value support in the arbitrary values documentation.
+​Basic usage
+​Controlling opacity of backdrop filters
+Use the backdrop-opacity-{amount} utilities to control the opacity of other backdrop filters applied to an element.
+
+
+  
+    backdrop-opacity-10
+    
+      
+      
+      
+    
+  
+  
+    backdrop-opacity-60
+    
+      
+      
+      
+    
+  
+  
+    backdrop-opacity-95
+    
+      
+      
+      
+    
+  
+
+
+<div class="backdrop-opacity-10 backdrop-invert bg-white/30 ...">
+  <!-- ... -->
+</div>
+<div class="backdrop-opacity-60 backdrop-invert bg-white/30 ...">
+  <!-- ... -->
+</div>
+<div class="backdrop-opacity-95 backdrop-invert bg-white/30 ...">
+  <!-- ... -->
+</div>
+​Removing backdrop filters
+To remove all of the backdrop filters on an element at once, use the backdrop-filter-none utility:<div class="backdrop-blur-md backdrop-opacity-60 md:backdrop-filter-none">
+  <!-- ... -->
+</div>
+This can be useful when you want to remove backdrop filters conditionally, such as on hover or at a particular breakpoint.
+
+​Applying conditionally
+​Hover, focus, and other states
+Tailwind lets you conditionally apply utility classes in different states using variant modifiers. For example, use hover:backdrop-opacity-60 to only apply the backdrop-opacity-60 utility on hover.<div class="backdrop-opacity-100 hover:backdrop-opacity-60">
+  <!-- ... -->
+</div>
+For a complete list of all available state modifiers, check out the Hover, Focus, & Other States documentation.
+​Breakpoints and media queries
+You can also use variant modifiers to target media queries like responsive breakpoints, dark mode, prefers-reduced-motion, and more. For example, use md:backdrop-opacity-60 to apply the backdrop-opacity-60 utility at only medium screen sizes and above.<div class="backdrop-opacity-100 md:backdrop-opacity-60">
+  <!-- ... -->
+</div>
+To learn more, check out the documentation on Responsive Design, Dark Mode and other media query modifiers.
+
+​Using custom values
+​Customizing your theme
+By default, Tailwind includes a handful of general purpose backdrop-opacity utilities. You can customize these values by editing theme.backdropOpacity or theme.extend.backdropOpacity in your tailwind.config.js file.
+tailwind.config.jsmodule.exports = {
+  theme: {
+    extend: {
+      backdropOpacity: {
+        15: '.15',
+      }
+    }
+  }
+}
+
+Learn more about customizing the default theme in the theme customization documentation.
+​Arbitrary values
+If you need to use a one-off backdrop-opacity value that doesn’t make sense to include in your theme, use square brackets to generate a property on the fly using any arbitrary value.<div class="backdrop-opacity-[.15]">
+  <!-- ... -->
+</div>
+Learn more about arbitrary value support in the arbitrary values documentation.
+​Basic usage
+​Changing backdrop saturation
+Use the backdrop-saturate-{amount} utilities to control an element’s backdrop saturation.
+
+
+  
+    backdrop-saturate-50
+    
+      
+      
+      
+    
+  
+  
+    backdrop-saturate-125
+    
+      
+      
+      
+    
+  
+  
+    backdrop-saturate-200
+    
+      
+      
+      
+    
+  
+
+
+<div class="backdrop-saturate-50 bg-white/30 ...">
+  <!-- ... -->
+</div>
+<div class="backdrop-saturate-125 bg-white/30 ...">
+  <!-- ... -->
+</div>
+<div class="backdrop-saturate-200 bg-white/30 ...">
+  <!-- ... -->
+</div>
+​Removing backdrop filters
+To remove all of the backdrop filters on an element at once, use the backdrop-filter-none utility:<div class="backdrop-blur-md backdrop-saturate-150 md:backdrop-filter-none">
+  <!-- ... -->
+</div>
+This can be useful when you want to remove backdrop filters conditionally, such as on hover or at a particular breakpoint.
+
+​Applying conditionally
+​Hover, focus, and other states
+Tailwind lets you conditionally apply utility classes in different states using variant modifiers. For example, use hover:backdrop-saturate-150 to only apply the backdrop-saturate-150 utility on hover.<div class="backdrop-saturate-50 hover:backdrop-saturate-150">
+  <!-- ... -->
+</div>
+For a complete list of all available state modifiers, check out the Hover, Focus, & Other States documentation.
+​Breakpoints and media queries
+You can also use variant modifiers to target media queries like responsive breakpoints, dark mode, prefers-reduced-motion, and more. For example, use md:backdrop-saturate-150 to apply the backdrop-saturate-150 utility at only medium screen sizes and above.<div class="backdrop-saturate-50 md:backdrop-saturate-150">
+  <!-- ... -->
+</div>
+To learn more, check out the documentation on Responsive Design, Dark Mode and other media query modifiers.
+
+​Using custom values
+​Customizing your theme
+By default, Tailwind includes a handful of general purpose backdrop-saturate utilities. You can customize these values by editing theme.backdropSaturate or theme.extend.backdropSaturate in your tailwind.config.js file.
+tailwind.config.jsmodule.exports = {
+  theme: {
+    extend: {
+      backdropSaturate: {
+        25: '.25',
+      }
+    }
+  }
+}
+
+Learn more about customizing the default theme in the theme customization documentation.
+​Arbitrary values
+If you need to use a one-off backdrop-saturate value that doesn’t make sense to include in your theme, use square brackets to generate a property on the fly using any arbitrary value.<div class="backdrop-saturate-[.25]">
+  <!-- ... -->
+</div>
+Learn more about arbitrary value support in the arbitrary values documentation.
+​Basic usage
+​Adding backdrop sepia filters
+Use the backdrop-sepia and backdrop-sepia-0 utilities to control whether an element’s backdrop should be rendered as sepia or in full color.
+
+
+  
+    backdrop-sepia-0
+    
+      
+      
+      
+    
+  
+  
+    backdrop-sepia
+    
+      
+      
+      
+    
+  
+
+
+<div class="backdrop-sepia-0 bg-white/30 ...">
+  <!-- ... -->
+</div>
+<div class="backdrop-sepia bg-white/30 ...">
+  <!-- ... -->
+</div>
+​Removing backdrop filters
+To remove all of the backdrop filters on an element at once, use the backdrop-filter-none utility:<div class="backdrop-blur-md backdrop-sepia md:backdrop-filter-none">
+  <!-- ... -->
+</div>
+This can be useful when you want to remove backdrop filters conditionally, such as on hover or at a particular breakpoint.
+
+​Applying conditionally
+​Hover, focus, and other states
+Tailwind lets you conditionally apply utility classes in different states using variant modifiers. For example, use hover:backdrop-sepia-0 to only apply the backdrop-sepia-0 utility on hover.<div class="backdrop-sepia hover:backdrop-sepia-0">
+  <!-- ... -->
+</div>
+For a complete list of all available state modifiers, check out the Hover, Focus, & Other States documentation.
+​Breakpoints and media queries
+You can also use variant modifiers to target media queries like responsive breakpoints, dark mode, prefers-reduced-motion, and more. For example, use md:backdrop-sepia-0 to apply the backdrop-sepia-0 utility at only medium screen sizes and above.<div class="backdrop-sepia md:backdrop-sepia-0">
+  <!-- ... -->
+</div>
+To learn more, check out the documentation on Responsive Design, Dark Mode and other media query modifiers.
+
+​Using custom values
+​Customizing your theme
+By default, Tailwind includes a handful of general purpose backdrop-sepia utilities. You can customize these values by editing theme.backdropSepia or theme.extend.backdropSepia in your tailwind.config.js file.
+tailwind.config.jsmodule.exports = {
+  theme: {
+    extend: {
+      backdropSepia: {
+        25: '.25',
+        75: '.75',
+      }
+    }
+  }
+}
+
+Learn more about customizing the default theme in the theme customization documentation.
+​Arbitrary values
+If you need to use a one-off backdrop-sepia value that doesn’t make sense to include in your theme, use square brackets to generate a property on the fly using any arbitrary value.<div class="backdrop-sepia-[.25]">
+  <!-- ... -->
+</div>
+Learn more about arbitrary value support in the arbitrary values documentation.
+​Basic usage
+​Fixed
+Use bg-fixed to fix the background image relative to the viewport.
+
+  
+    
+      
+        My trip to the summit
+        November 16, 2021 · 4 min read
+        Maybe we can live without libraries, people like you and me. Maybe. Sure, we're too old to change the world, but what about that kid, sitting down, opening a book, right now, in a branch at the local library and finding drawings of pee-pees and wee-wees on the Cat in the Hat and the Five Chinese Brothers? Doesn't HE deserve better?
+        Look. If you think this is about overdue fines and missing books, you'd better think again. This is about that kid's right to read a book without getting his mind warped! Or: maybe that turns you on, Seinfeld; maybe that's how y'get your kicks. You and your good-time buddies.
+      
+    
+  
+
+<div class="bg-fixed ..." style="background-image: url(...)"></div>
+​Local
+Use bg-local to scroll the background image with the container and the viewport.
+
+  
+    
+      
+        
+          "Because the mail never stops. It just keeps coming and coming and coming, there's never a let-up. It's relentless. Every day it piles up more and more and more. And you gotta get it out but the more you get it out the more it keeps coming in. And then the barcode reader breaks and it's Publisher's Clearing House day."
+          — Newman
+        
+      
+    
+  
+
+<div class="bg-local ..." style="background-image: url(...)"></div>
+​Scroll
+Use bg-scroll to scroll the background image with the viewport, but not with the container.
+
+  
+    
+      
+        
+          "Because the mail never stops. It just keeps coming and coming and coming, there's never a let-up. It's relentless. Every day it piles up more and more and more. And you gotta get it out but the more you get it out the more it keeps coming in. And then the barcode reader breaks and it's Publisher's Clearing House day."
+          — Newman
+        
+      
+    
+  
+
+<div class="bg-scroll ..." style="background-image: url(...)"></div>
+
+​Applying conditionally
+​Hover, focus, and other states
+Tailwind lets you conditionally apply utility classes in different states using variant modifiers. For example, use hover:bg-fixed to only apply the bg-fixed utility on hover.<div class="bg-local hover:bg-fixed">
+  <!-- ... -->
+</div>
+For a complete list of all available state modifiers, check out the Hover, Focus, & Other States documentation.
+​Breakpoints and media queries
+You can also use variant modifiers to target media queries like responsive breakpoints, dark mode, prefers-reduced-motion, and more. For example, use md:bg-fixed to apply the bg-fixed utility at only medium screen sizes and above.<div class="bg-local md:bg-fixed">
+  <!-- ... -->
+</div>
+To learn more, check out the documentation on Responsive Design, Dark Mode and other media query modifiers.
+​Basic usage
+​Setting the background blend mode
+Use the bg-blend-{mode} utilities to control how an element’s background image(s) should blend with its background color.
+<div class="bg-blend-multiply ...">
+  <!-- ... -->
+</div>
+
+​Applying conditionally
+​Hover, focus, and other states
+Tailwind lets you conditionally apply utility classes in different states using variant modifiers. For example, use hover:bg-blend-darken to only apply the bg-blend-darken utility on hover.<div class="bg-blend-lighten hover:bg-blend-darken">
+  <!-- ... -->
+</div>
+For a complete list of all available state modifiers, check out the Hover, Focus, & Other States documentation.
+​Breakpoints and media queries
+You can also use variant modifiers to target media queries like responsive breakpoints, dark mode, prefers-reduced-motion, and more. For example, use md:bg-blend-darken to apply the bg-blend-darken utility at only medium screen sizes and above.<div class="bg-blend-lighten md:bg-blend-darken">
+  <!-- ... -->
+</div>
+To learn more, check out the documentation on Responsive Design, Dark Mode and other media query modifiers.
+​Basic usage
+​Setting the background clip
+Use the bg-clip-{keyword} utilities to control the bounding box of an element’s background.
+
+  
+    bg-clip-border
+    
+  
+  
+    bg-clip-padding
+    
+  
+  
+    bg-clip-content
+    
+  
+
+<div class="bg-clip-border p-6 bg-violet-600 border-4 border-violet-300 border-dashed"></div>
+<div class="bg-clip-padding p-6 bg-violet-600 border-4 border-violet-300 border-dashed"></div>
+<div class="bg-clip-content p-6 bg-violet-600 border-4 border-violet-300 border-dashed"></div>
+​Cropping to text
+Use bg-clip-text to crop an element’s background to match the shape of the text. Useful for effects where you want a background image to be visible through the text.
+
+  
+    Hello world
+  
+
+<div class="text-5xl font-extrabold ...">
+  <span class="bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-violet-500">
+    Hello world
+  </span>
+</div>
+
+​Applying conditionally
+​Hover, focus, and other states
+Tailwind lets you conditionally apply utility classes in different states using variant modifiers. For example, use hover:bg-clip-padding to only apply the bg-clip-padding utility on hover.<div class="bg-clip-border hover:bg-clip-padding">
+  <!-- ... -->
+</div>
+For a complete list of all available state modifiers, check out the Hover, Focus, & Other States documentation.
+​Breakpoints and media queries
+You can also use variant modifiers to target media queries like responsive breakpoints, dark mode, prefers-reduced-motion, and more. For example, use md:bg-clip-padding to apply the bg-clip-padding utility at only medium screen sizes and above.<div class="bg-clip-border md:bg-clip-padding">
+  <!-- ... -->
+</div>
+To learn more, check out the documentation on Responsive Design, Dark Mode and other media query modifiers.

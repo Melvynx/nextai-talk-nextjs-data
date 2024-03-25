@@ -248,13 +248,6 @@ async function saveToDatabase(texts: TextFileTokenEmbedding[]) {
     const tokens = enconding.encode(text);
     const tokensLength = tokens.length;
 
-    await sql(insertQuery, [
-      text,
-      tokensLength,
-      filePath,
-      JSON.stringify(vectorPadded),
-    ]);
-
     console.log(
       "🎈 Saved to database :",
       filePath,
